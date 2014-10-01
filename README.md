@@ -19,6 +19,22 @@ Alternatively, under Bash-compatible environments you can just call the `build.s
 
     $ ./build.sh
 
+The build scripts expect to find the include files for [Clarus]() on a folder at the same level as the project's base folder, for example:
+
+    .
+    |
+    +--+ Cight
+    |  |
+    |  +-- build
+    |  +-- include
+    |  +-- src
+    |
+    +-- Clarus
+       |
+       +-- build
+       +-- include
+       +-- src
+
 TO DO
 -----
 
