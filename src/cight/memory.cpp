@@ -1,5 +1,5 @@
 
-#include <cight/working_memory.hpp>
+#include <cight/memory.hpp>
 using cight::Memory;
 
 #include <cight/transforms.hpp>

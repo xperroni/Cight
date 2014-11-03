@@ -1,8 +1,8 @@
 #ifndef DEJAVU_DRIFT_ESTIMATOR_H
 #define DEJAVU_DRIFT_ESTIMATOR_H
 
+#include <cight/memory.hpp>
 #include <cight/sensor_stream.hpp>
-#include <cight/working_memory.hpp>
 
 #include <clarus/core/list.hpp>
 
