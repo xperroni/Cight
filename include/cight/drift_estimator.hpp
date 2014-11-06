@@ -2,7 +2,7 @@
 #define DEJAVU_DRIFT_ESTIMATOR_H
 
 #include <cight/memory.hpp>
-#include <cight/sensor_stream.hpp>
+#include <cight/stream_matcher.hpp>
 
 #include <clarus/core/list.hpp>
 
@@ -13,23 +13,21 @@ namespace cight {
 }
 
 class cight::Estimator {
-    clarus::List<cv::Mat> changes;
+    Memory teach;
 
-    cv::Mat odometry;
+    Memory replay;
 
-    Memory retrace;
+    StreamMatcher::P matcher;
 
     int bins;
 
     int window;
 
-    int index;
-
 public:
     /*
     Creates a new drift estimator, using the giving folder for storage.
     */
-    Estimator(int bins, int window, size_t range_t, size_t range_r, SensorStream &sensors);
+    Estimator(int bins, int window, size_t range, StreamMatcher::P matcher);
 
     /*
     Virtual destructor. Enforces polymorphism. Do not remove.
@@ -39,7 +37,7 @@ public:
     /*
     Calculates a vector of drift estimate likelihoods.
     */
-    cv::Mat operator () (SensorStream &sensors);
+    cv::Mat operator () ();
 
     /*
     Erases the estimator's memory, forcing it to rebuild its image base on the next
@@ -50,7 +48,7 @@ public:
     /*
     Returns whether the current estimated position is the last known one.
     */
-    bool arrived();
+    bool more() const;
 };
 
 #endif
