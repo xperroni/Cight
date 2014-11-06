@@ -1,30 +1,66 @@
-#ifndef DEJAVU_SENSOR_STREAM_HPP
-#define DEJAVU_SENSOR_STREAM_HPP
+/*
+Copyright (c) Helio Perroni Filho <xperroni@gmail.com>
+
+This file is part of Cight.
+
+Cight is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Cight is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with Cight. If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef CIGHT_SENSOR_STREAM_HPP
+#define CIGHT_SENSOR_STREAM_HPP
+
+#include <boost/smart_ptr.hpp>
 
 #include <opencv2/opencv.hpp>
 
 namespace cight {
-    class SensorStream;
+    struct SensorStream;
 }
 
-class cight::SensorStream {
-public:
-    struct S {
-        cv::Mat image;
-
-        double x;
-
-        S(const cv::Mat &_image, double _x):
-            image(_image),
-            x(_x)
+/**
+\brief Abstract superclass for sensor feeds.
+*/
+struct cight::SensorStream {
+    /** \brief Reference-counted smart pointer type. */
+    struct P: boost::shared_ptr<SensorStream> {
+        P():
+            boost::shared_ptr<SensorStream>()
         {
             // Nothing to do.
         }
+
+        P(SensorStream *p):
+            boost::shared_ptr<SensorStream>(p)
+        {
+            // Nothing to do.
+        }
+
+        cv::Mat operator () () {
+            SensorStream &sensor = *get();
+            return sensor();
+        }
     };
 
-    virtual S operator () () = 0;
+    /**
+    \brief Returns the current sensor reading.
+    */
+    virtual cv::Mat operator () () = 0;
 
-    virtual bool active() = 0;
+    /**
+    \brief Returns whether the stream is still active.
+    */
+    virtual bool more() const = 0;
 };
 
 #endif
