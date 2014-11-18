@@ -85,7 +85,7 @@ void VisualMatcher::readReplayStream() {
     replayFrames.append(frame);
     replayMaps.append(regions);
 
-    if (replayFrames.size() > similarities.cols) {
+    if (replayFrames.size() > similarities.rows) {
         replayFrames.remove(0);
         replayMaps.remove(0);
     }
@@ -95,7 +95,8 @@ void VisualMatcher::computeSimilarityMap() {
     int rows = similarities.rows;
     int cols = similarities.cols;
     for (int i = 0; i < rows; i++) {
-        const InterestMap &regions = replayMaps[i];
+        std::cerr << "Processing similarity map #" << i << std::endl;
+        const InterestMap &regions = replayMaps.at(i);
         List<cv::Mat> results = regions(teachEdges, searchRange);
         const cv::Mat &responses = results[0];
         cv::Rect roi(0, i, cols, 1);
@@ -139,7 +140,7 @@ clarus::List<cv::Mat> VisualMatcher::operator() () {
     else if (index == yn) {
         readReplayStream();
         readTeachStream();
-        computeSimilarityMap();
+        //computeSimilarityMap();
         index = yn;
     }
     else {
@@ -147,6 +148,12 @@ clarus::List<cv::Mat> VisualMatcher::operator() () {
     }
 
     int matched = std::min(cols - 1, (int) (index * tan));
+    while (matched >= teachFrames.size()) {
+        readReplayStream();
+        readTeachStream();
+        matched--;
+        index--;
+    }
 
     viewer::show("Teach", teachFrames.at(matched), 0, 0);
     viewer::show("Replay", replayFrames.at(index), 650, 0);
