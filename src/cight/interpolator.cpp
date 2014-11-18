@@ -78,31 +78,59 @@ List<cv::Point> cight::interpolateSlide(const cv::Mat &similarities) {
     return points;
 }
 
+static cv::Point lineP0(double tan, double x2, double y2) {
+    double yd = y2 - tan * x2;
+    if (yd >= 0) {
+        return cv::Point(0, yd);
+    }
+    else {
+        return cv::Point(-yd / tan, 0);
+    }
+}
+
+static cv::Point linePn(double tan, double x2, double y2, const cv::Size &size) {
+    double xn = size.width - 1;
+    double yn = size.height - 1;
+    double yd = yn - y2;
+    double xd = x2 + yd / tan;
+    if (xd <= xn) {
+        return cv::Point(xd, yn);
+    }
+    else {
+        return cv::Point(xn, y2 + (xn - x2) * tan);
+    }
+}
+
 List<cv::Point> cight::interpolateHough(const cv::Mat &similarities) {
     int rows = similarities.rows;
     int cols = similarities.cols;
 
     List<cv::Vec4i> lines;
     cv::Mat votes = images::convert(similarities, CV_8U);
-    int minLineLength = sqrt(pow(rows * 0.5, 2.0) + pow(cols * 0.5, 2.0));
-    cv::HoughLinesP(votes, *lines, 1, CV_PI / 180.0, 50, minLineLength, 10);
+    cv::HoughLinesP(votes, *lines, 1, CV_PI / 180.0, 5, 10, 10);
+
+    // If no lines found, fall back to the brute force approach.
+    if (lines.size() == 0) {
+        return interpolateSlide(similarities);
+    }
 
     cv::Point p0;
     cv::Point pn;
     float best = 0;
     for (int i = 0, n = lines.size(); i < n; i++) {
         const cv::Vec4i &line = lines[i];
-        int x1 = line[0];
-        int y1 = line[1];
-        int x2 = line[2];
-        int y2 = line[3];
+        double x1 = line[0];
+        double y1 = line[1];
+        double x2 = line[2];
+        double y2 = line[3];
 
         if (x2 - x1 <= 0 || y2 - y1 <= 0) {
             continue;
         }
 
-        cv::Point a(x1, y1);
-        cv::Point b(x2, y2);
+        double tan = (y2 - y1) / (x2 - x1);
+        cv::Point a = lineP0(tan, x2, y2);
+        cv::Point b = linePn(tan, x2, y2, similarities.size());
         cv::Mat mask(rows, cols, CV_8U, cv::Scalar(0));
         cv::line(mask, a, b, cv::Scalar(255));
 
