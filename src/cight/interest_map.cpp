@@ -23,10 +23,29 @@ using cight::InterestMap;
 
 #include <map>
 
+#ifdef DIAGNOSTICS
+    #include <clarus/io/viewer.hpp>
+    #include <iostream>
+
+    static void display(const cv::Mat &bgr, const List<cight::InterestRegion> &regions) {
+        static cv::Scalar RED(0, 0, 255);
+
+        cv::Mat canvas = bgr.clone();
+        for (int i = 0, n = regions.size(); i < n; i++) {
+            cv::rectangle(canvas, regions[i].bounds(), RED);
+        }
+
+        viewer::show("Interest Regions", canvas);
+        cv::waitKey(WAIT_KEY_MS);
+    }
+#else
+    #define display(A, B)
+#endif
+
 InterestMap::InterestMap(Selector selector, const cv::Mat &bgr, int padding):
     regions(selector(bgr, padding))
 {
-    // Nothing to do.
+    display(bgr, regions);
 }
 
 List<cv::Mat> InterestMap::operator () (const List<cv::Mat> &images, int range) const {

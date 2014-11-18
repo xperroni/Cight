@@ -22,6 +22,7 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 
 #include <cight/interest_region.hpp>
 #include <cight/interest_selector.hpp>
+#include <cight/settings.hpp>
 
 #include <clarus/core/list.hpp>
 
