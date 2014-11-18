@@ -12,6 +12,7 @@ find_package(Boost REQUIRED COMPONENTS filesystem system)
 find_package(OpenCV 2.4.8 REQUIRED)
 
 add_library(cight
+    "include/cight/camera_stream.hpp"
     "include/cight/drift_estimator.hpp"
     "include/cight/drift_recorder.hpp"
     "include/cight/drift_reduce.hpp"
@@ -22,10 +23,12 @@ add_library(cight
     "include/cight/interpolator.hpp"
     "include/cight/memory.hpp"
     "include/cight/sensor_stream.hpp"
+    "include/cight/settings.hpp"
     "include/cight/stream_matcher.hpp"
     "include/cight/transforms.hpp"
     "include/cight/video_stream.hpp"
     "include/cight/visual_matcher.hpp"
+    "src/cight/camera_stream.cpp"
     "src/cight/drift_estimator.cpp"
     "src/cight/drift_recorder.cpp"
     "src/cight/drift_reduce.cpp"
