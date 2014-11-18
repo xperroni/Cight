@@ -66,6 +66,10 @@ float InterestRegion::operator () (const cv::Mat &image, int range) const {
     return clarus::max(responses);
 }
 
+const cv::Rect &InterestRegion::bounds() const {
+    return roi;
+}
+
 const cv::Point &InterestRegion::center() const {
     return poi;
 }

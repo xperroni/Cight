@@ -81,6 +81,14 @@ public:
     */
     float operator () (const cv::Mat &image, int range) const;
 
+    /**
+    \brief Returns the boundaries of the interest region.
+    */
+    const cv::Rect &bounds() const;
+
+    /**
+    \brief Returns the coordinates for the center of the interest region.
+    */
     const cv::Point &center() const;
 
     /**
