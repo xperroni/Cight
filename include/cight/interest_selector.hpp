@@ -38,6 +38,14 @@ namespace cight {
     typedef boost::function<clarus::List<InterestRegion>(const cv::Mat&, int padding)> Selector;
 
     /**
+    \brief Enforces an upper limit on the number of returned interest regions.
+
+    If the number of interest regions returned by the given selector is greater than
+    \c limit, excess regions are removed from the end of the list to make it fit.
+    */
+    clarus::List<InterestRegion> selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding);
+
+    /**
     \brief Filters selected interest regions by distance from the image center.
 
     Given a list \c regions of interest regions returned by the given selector, the

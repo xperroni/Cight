@@ -27,6 +27,15 @@ using clarus::Point;
 #include <clarus/vision/colors.hpp>
 #include <clarus/vision/filters.hpp>
 
+List<InterestRegion> cight::selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding) {
+    List<InterestRegion> regions = selector(bgr, padding);
+    for (int n = 0; (n = regions.size()) > limit;) {
+        regions.remove(n - 1);
+    }
+
+    return regions;
+}
+
 List<InterestRegion> cight::selectBorders(Selector selector, float ratio, const cv::Mat &bgr, int padding) {
     int xc = bgr.cols / 2;
     int yc = bgr.rows / 2;
