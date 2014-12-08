@@ -34,11 +34,12 @@ using clarus::List;
 VisualMatcher::VisualMatcher(
     SensorStream::P teach,
     SensorStream::P replay,
-    const cv::Size &window,
+    const int window,
     Interpolator _interpolator,
     Selector _selector,
-    int _padding,
-    int range
+    int _padding_a,
+    int _padding_b,
+    int _padding_c
 ):
     teachStream(teach),
     replayStream(replay),
@@ -47,10 +48,11 @@ VisualMatcher::VisualMatcher(
     replayFrames(),
     replayMaps(),
     selector(_selector),
-    padding(_padding),
-    searchRange(range),
+    padding_a(_padding_a),
+    padding_b(_padding_b),
+    padding_c(_padding_c),
     interpolator(_interpolator),
-    similarities(window, CV_32F, cv::Scalar(0)),
+    similarities(window, window, CV_32F, cv::Scalar(0)),
     index(-1),
     p0(0, 0),
     tan(0),
@@ -69,7 +71,7 @@ void VisualMatcher::readTeachStream() {
     teachFrames.append(frame);
     teachEdges.append(edges);
 
-    if (teachFrames.size() > similarities.cols) {
+    if (teachFrames.size() > similarities.rows) {
         teachFrames.remove(0);
         teachEdges.remove(0);
     }
@@ -81,61 +83,19 @@ void VisualMatcher::readReplayStream() {
     }
 
     cv::Mat frame = replayStream();
-    InterestMap regions(selector, frame, padding);
+    FeatureMap features(selector, frame, padding_a);
     replayFrames.append(frame);
-    replayMaps.append(regions);
+    replayMaps.append(features);
 
-    if (replayFrames.size() > similarities.rows) {
+    if (replayFrames.size() > similarities.cols) {
         replayFrames.remove(0);
         replayMaps.remove(0);
     }
 }
 
-void VisualMatcher::computeSimilarityMap() {
-    int rows = similarities.rows;
-    int cols = similarities.cols;
-    for (int i = 0; i < rows; i++) {
-        std::cerr << "Processing similarity map #" << i << std::endl;
-        const InterestMap &regions = replayMaps.at(i);
-        List<cv::Mat> results = regions(teachEdges, searchRange);
-        const cv::Mat &responses = results[0];
-        cv::Rect roi(0, i, cols, 1);
-        cv::Mat row(similarities, roi);
-        responses.copyTo(row);
-    }
-
-    List<cv::Point> line = interpolator(similarities);
-    cv::Point &p1 = line[1];
-    p0 = line[0];
-    yn = p1.y;
-
-    float dx = p1.x - p0.x;
-    float dy = p1.y - p0.y;
-    tan = dx / dy;
-
-    std::ofstream file("similarities.txt", std::ios_base::out | std::ios_base::app);
-    cv::Mat bgr = depths::bgr(similarities);
-    cv::line(bgr, p0, p1, cv::Scalar(0, 0, 0));
-    viewer::show("Similarities", images::scale(bgr, cv::Size(300, 300)));
-    depths::save(similarities, file);
-    file << std::endl;
-    cv::waitKey(1000);
-}
-
 clarus::List<cv::Mat> VisualMatcher::operator() () {
-    int cols = similarities.cols;
     if (index == -1) {
-        int rows = similarities.rows;
-        for (int i = 0; i < rows; i++) {
-            readReplayStream();
-        }
-
-        for (int j = 0; j < cols; j++) {
-            readTeachStream();
-        }
-
-        computeSimilarityMap();
-        index = p0.y;
+        computeMatching();
     }
     else if (index == yn) {
         readReplayStream();
@@ -147,7 +107,8 @@ clarus::List<cv::Mat> VisualMatcher::operator() () {
         index++;
     }
 
-    int matched = std::min(cols - 1, (int) (index * tan));
+    int rows = similarities.rows;
+    int matched = std::min(rows - 1, (int) (index * tan));
     while (matched >= teachFrames.size()) {
         readReplayStream();
         readTeachStream();
@@ -157,7 +118,7 @@ clarus::List<cv::Mat> VisualMatcher::operator() () {
 
     viewer::show("Teach", teachFrames.at(matched), 0, 0);
     viewer::show("Replay", replayFrames.at(index), 650, 0);
-    cv::waitKey(1000);
+    cv::waitKey(200);
 
     List<cv::Mat> frames;
     frames.append(teachFrames.at(matched));
@@ -165,6 +126,60 @@ clarus::List<cv::Mat> VisualMatcher::operator() () {
     return frames;
 }
 
+void VisualMatcher::fillTeachBuffer() {
+    int rows = similarities.rows;
+    for (int i = teachFrames.size(); i < rows; i++) {
+        readTeachStream();
+    }
+}
+
+void VisualMatcher::fillReplayBuffer() {
+    int cols = similarities.cols;
+    for (int j = replayFrames.size(); j < cols; j++) {
+        readReplayStream();
+    }
+}
+
+void VisualMatcher::computeMatching() {
+    fillTeachBuffer();
+    fillReplayBuffer();
+
+    int rows = similarities.rows;
+    int cols = similarities.cols;
+    for (int j = 0; j < cols; j++) {
+        std::cerr << "Processing replay image #" << j << std::endl;
+        const FeatureMap &features = replayMaps.at(j);
+        int i0 = (padding_c != 0 ? std::max(j - padding_c, 0) : 0);
+        int in = (padding_c != 0 ? std::min(j + padding_c, rows) : 0);
+
+        List<cv::Mat> results = features(teachEdges, padding_b, i0, in);
+        const cv::Mat &responses = results[0];
+        cv::Rect roi(j, 0, 1, rows);
+        cv::Mat column(similarities, roi);
+        responses.copyTo(column);
+    }
+
+    List<cv::Point> line = interpolator(similarities);
+    std::cerr << line << std::endl;
+
+    cv::Point &p1 = line[1];
+    p0 = line[0];
+    yn = p1.y;
+
+    float dx = p1.x - p0.x;
+    float dy = p1.y - p0.y;
+    tan = dy / dx;
+    index = p0.y;
+
+    std::ofstream file("similarities.txt", std::ios_base::out | std::ios_base::app);
+    cv::Mat bgr = depths::bgr(similarities);
+    cv::line(bgr, p0, p1, cv::Scalar(0, 0, 0));
+    viewer::show("Similarities", images::scale(bgr, cv::Size(300, 300)));
+    depths::save(similarities, file);
+    file << std::endl;
+    cv::waitKey(200);
+}
+
 bool VisualMatcher::more() const {
-    return replayStream->more();
+    return (teachStream->more() && replayStream->more());
 }

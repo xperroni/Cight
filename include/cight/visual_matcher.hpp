@@ -20,8 +20,8 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #ifndef CIGHT_VISUAL_MATCHER_HPP
 #define CIGHT_VISUAL_MATCHER_HPP
 
-#include <cight/interest_map.hpp>
-#include <cight/interest_selector.hpp>
+#include <cight/feature_map.hpp>
+#include <cight/feature_selector.hpp>
 #include <cight/interpolator.hpp>
 #include <cight/memory.hpp>
 #include <cight/sensor_stream.hpp>
@@ -50,16 +50,19 @@ class cight::VisualMatcher: public StreamMatcher {
     clarus::List<cv::Mat> replayFrames;
 
     /** \brief Memory buffer for replay stream interest maps. */
-    clarus::List<InterestMap> replayMaps;
+    clarus::List<FeatureMap> replayMaps;
 
     /** \brief Function used to select interest regions. */
     Selector selector;
 
-    /** \brief Padding for interest regions. */
-    int padding;
+    /** \brief Padding for feature points. */
+    int padding_a;
 
-    /** \brief Range around each interest region to search for good matches. */
-    int searchRange;
+    /** \brief Additional padding to search for good matches. */
+    int padding_b;
+
+    /** \brief Range around the current teach image to search for matches. */
+    int padding_c;
 
     /** \brief Function used to interpolate a stream matching line over the current similarity map. */
     Interpolator interpolator;
@@ -93,11 +96,6 @@ class cight::VisualMatcher: public StreamMatcher {
     */
     void readReplayStream();
 
-    /**
-    \brief Update the similarity map.
-    */
-    void computeSimilarityMap();
-
 public:
     /**
     \brief Creates a new stream matcher.
@@ -106,28 +104,40 @@ public:
 
     \param replay Replay (real-time) video stream.
 
-    \param window Size of the memory buffers for teach (width) and replay (height) streams.
+    \param window Size of the memory buffers for teach and replay streams.
 
     \param interpolator Function used to interpolate a stream matching line over the current similarity map.
 
     \param selector Function used to select interest regions.
 
-    \param padding Padding of interest regions.
+    \param padding_a Padding around feature points, defining the area of patches.
 
-    \param range Range around each interest region to search for good matches.
+    \param padding_b Additional padding for teach image patches.
+
+    \param padding_c Padding around the current teach image to search for matches.
     */
     VisualMatcher(
         SensorStream::P teach,
         SensorStream::P replay,
-        const cv::Size &window,
+        int window,
         Interpolator interpolator,
         Selector selector,
-        int padding,
-        int range
+        int padding_a,
+        int padding_b,
+        int padding_c
     );
 
-    // See cight::StreamMatcher:: operator() ()
+    // See cight::StreamMatcher::operator() ()
     clarus::List<cv::Mat> operator() ();
+
+    // See cight::StreamMatcher::fillReplayBuffer()
+    virtual void fillReplayBuffer();
+
+    // See cight::StreamMatcher::fillTeachBuffer()
+    virtual void fillTeachBuffer();
+
+    // See cight::StreamMatcher::computeMatching()
+    virtual void computeMatching();
 
     // See cight::StreamMatcher::more()
     bool more() const;
