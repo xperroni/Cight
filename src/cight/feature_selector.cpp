@@ -17,8 +17,8 @@ You should have received a copy of the GNU General Public License
 along with Cight. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <cight/interest_selector.hpp>
-using cight::InterestRegion;
+#include <cight/feature_selector.hpp>
+using cight::FeaturePoint;
 using clarus::List;
 
 #include <clarus/model/point.hpp>
@@ -27,8 +27,8 @@ using clarus::Point;
 #include <clarus/vision/colors.hpp>
 #include <clarus/vision/filters.hpp>
 
-List<InterestRegion> cight::selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding) {
-    List<InterestRegion> regions = selector(bgr, padding);
+List<FeaturePoint> cight::selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding) {
+    List<FeaturePoint> regions = selector(bgr, padding);
     for (int n = 0; (n = regions.size()) > limit;) {
         regions.remove(n - 1);
     }
@@ -36,15 +36,15 @@ List<InterestRegion> cight::selectAtMost(Selector selector, int limit, const cv:
     return regions;
 }
 
-List<InterestRegion> cight::selectBorders(Selector selector, float ratio, const cv::Mat &bgr, int padding) {
+List<FeaturePoint> cight::selectBorders(Selector selector, float ratio, const cv::Mat &bgr, int padding) {
     int xc = bgr.cols / 2;
     int yc = bgr.rows / 2;
 
-    List<InterestRegion> selected = selector(bgr, padding);
-    std::map<uint64_t, const InterestRegion*> ordered;
+    List<FeaturePoint> selected = selector(bgr, padding);
+    std::map<uint64_t, const FeaturePoint*> ordered;
     for (int k = 0, n = selected.size(); k < n; k++) {
-        const InterestRegion &region = selected[k];
-        const cv::Point &center = region.center();
+        const FeaturePoint &region = selected[k];
+        const cv::Point &center = region.point();
         if (!region.empty()) {
             uint64_t d = abs(xc - center.x) + abs(yc - center.y);
             uint64_t key = (d << 32) + ordered.size();
@@ -52,9 +52,9 @@ List<InterestRegion> cight::selectBorders(Selector selector, float ratio, const 
         }
     }
 
-    List<InterestRegion> regions;
+    List<FeaturePoint> regions;
     int tops = ordered.size() * ratio;
-    std::map<uint64_t, const InterestRegion*>::iterator k = --(ordered.end());
+    std::map<uint64_t, const FeaturePoint*>::iterator k = --(ordered.end());
     for (int i = 0; i < tops; ++i, --k) {
         regions.append(*(k->second));
     }
@@ -62,7 +62,7 @@ List<InterestRegion> cight::selectBorders(Selector selector, float ratio, const 
     return regions;
 }
 
-List<InterestRegion> cight::selectGoodFeatures(
+List<FeaturePoint> cight::selectGoodFeatures(
     cv::GoodFeaturesToTrackDetector &detector,
     const cv::Mat &bgr,
     int padding
@@ -72,10 +72,10 @@ List<InterestRegion> cight::selectGoodFeatures(
     detector.detect(edges, *keypoints);
 
     int rows = keypoints.size();
-    List<InterestRegion> regions;
+    List<FeaturePoint> regions;
     for (int k = 0; k < rows; k++) {
         const cv::Point &point = keypoints[k].pt;
-        regions.append(InterestRegion(edges, point.x, point.y, padding));
+        regions.append(FeaturePoint(point.x, point.y, edges, padding));
     }
 
     return regions;
@@ -131,7 +131,7 @@ static cv::Mat boundaries(const cv::Mat &bgr, const cv::Mat &markers) {
 
 typedef std::vector<cv::Point> Contour;
 
-List<InterestRegion> cight::selectSaturation(const cv::Mat &bgr, int padding) {
+List<FeaturePoint> cight::selectSaturation(const cv::Mat &bgr, int padding) {
     static cv::Scalar WHITE = cv::Scalar::all(255);
 
     cv::Mat s = saturation_mask(bgr);
@@ -145,7 +145,7 @@ List<InterestRegion> cight::selectSaturation(const cv::Mat &bgr, int padding) {
     int ceil = bgr.size().area();
 
     cv::Mat edges = filter::sobel(colors::grayscale(bgr));
-    List<InterestRegion> regions;
+    List<FeaturePoint> regions;
     std::set<Point> unique;
     for (int i = 0, n = contours.size(); i < n; i++) {
         // Ignores repeated contours.
@@ -165,7 +165,7 @@ List<InterestRegion> cight::selectSaturation(const cv::Mat &bgr, int padding) {
         }
 
         // Records the selected feature.
-        regions.append(InterestRegion(edges, feature[0], feature[1], padding));
+        regions.append(FeaturePoint(feature[0], feature[1], edges, padding));
         unique.insert(feature);
     }
 

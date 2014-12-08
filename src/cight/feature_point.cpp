@@ -17,13 +17,13 @@ You should have received a copy of the GNU General Public License
 along with Cight. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <cight/interest_region.hpp>
-using cight::InterestRegion;
+#include <cight/feature_point.hpp>
+using cight::FeaturePoint;
 
 #include <clarus/core/math.hpp>
 #include <clarus/vision/fourier.hpp>
 
-InterestRegion::InterestRegion():
+FeaturePoint::FeaturePoint():
     roi(0, 0, 0, 0),
     poi(0, 0),
     patch()
@@ -31,34 +31,26 @@ InterestRegion::InterestRegion():
     // Nothing to do.
 }
 
-InterestRegion::InterestRegion(const cv::Mat &image, int x, int y, int w, int h):
-    roi(x, y, w, h),
-    poi(x + w / 2, y + h / 2),
-    patch(image, roi)
-{
-    // Nothing to do.
-}
-
-inline cv::Rect regionOfInterest(const cv::Mat &image, int xf, int yf, int padding) {
+inline cv::Rect regionOfInterest(int x, int y, const cv::Mat &image, int padding) {
     int side = 2 * padding + 1;
-    int x = std::min(std::max(0, xf - padding), image.cols - side);
-    int y = std::min(std::max(0, yf - padding), image.rows - side);
-    return cv::Rect(x, y, side, side);
+    int xf = std::min(std::max(0, x - padding), image.cols - side);
+    int yf = std::min(std::max(0, y - padding), image.rows - side);
+    return cv::Rect(xf, yf, side, side);
 }
 
-InterestRegion::InterestRegion(const cv::Mat &image, int x, int y, int padding):
-    roi(regionOfInterest(image, x, y, padding)),
+FeaturePoint::FeaturePoint(int x, int y, const cv::Mat &image, int padding):
+    roi(regionOfInterest(x, y, image, padding)),
     poi(roi.x + roi.width / 2, roi.y + roi.height / 2),
     patch(image, roi)
 {
     // Nothing to do.
 }
 
-float InterestRegion::operator () (const cv::Mat &image, int range) const {
-    int w = roi.width + 2 * range;
-    int h = roi.height + 2 * range;
-    int x = std::min(std::max(0, roi.x - range), image.cols - w);
-    int y = std::min(std::max(0, roi.y - range), image.rows - h);
+float FeaturePoint::operator () (const cv::Mat &image, int padding) const {
+    int w = roi.width + 2 * padding;
+    int h = roi.height + 2 * padding;
+    int x = std::min(std::max(0, roi.x - padding), image.cols - w);
+    int y = std::min(std::max(0, roi.y - padding), image.rows - h);
 
     cv::Mat neighborhood(image, cv::Rect(x, y, w, h));
     cv::Mat responses = fourier::correlate(neighborhood, patch);
@@ -66,14 +58,14 @@ float InterestRegion::operator () (const cv::Mat &image, int range) const {
     return clarus::max(responses);
 }
 
-const cv::Rect &InterestRegion::bounds() const {
+const cv::Rect &FeaturePoint::bounds() const {
     return roi;
 }
 
-const cv::Point &InterestRegion::center() const {
+const cv::Point &FeaturePoint::point() const {
     return poi;
 }
 
-bool InterestRegion::empty() const {
+bool FeaturePoint::empty() const {
     return (cv::sum(patch)[0] == 0);
 }

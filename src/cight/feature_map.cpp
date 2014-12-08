@@ -17,9 +17,9 @@ You should have received a copy of the GNU General Public License
 along with Cight. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <cight/interest_map.hpp>
+#include <cight/feature_map.hpp>
 using clarus::List;
-using cight::InterestMap;
+using cight::FeatureMap;
 
 #include <map>
 
@@ -27,7 +27,7 @@ using cight::InterestMap;
     #include <clarus/io/viewer.hpp>
     #include <iostream>
 
-    static void display(const cv::Mat &bgr, const List<cight::InterestRegion> &regions) {
+    static void display(const cv::Mat &bgr, const List<cight::FeaturePoint> &regions) {
         static cv::Scalar RED(0, 0, 255);
 
         cv::Mat canvas = bgr.clone();
@@ -42,32 +42,39 @@ using cight::InterestMap;
     #define display(A, B)
 #endif
 
-InterestMap::InterestMap(Selector selector, const cv::Mat &bgr, int padding):
-    regions(selector(bgr, padding))
+FeatureMap::FeatureMap(Selector selector, const cv::Mat &bgr, int padding):
+    features(selector(bgr, padding))
 {
-    display(bgr, regions);
+    display(bgr, features);
 }
 
-List<cv::Mat> InterestMap::operator () (const List<cv::Mat> &images, int range) const {
-    int rows = regions.size();
-    int cols = images.size();
+List<cv::Mat> FeatureMap::operator () (const List<cv::Mat> &images, int padding, int i0, int n) const {
+    int rows = images.size();
+    int cols = features.size();
+    if (n == 0) {
+        n = rows;
+    }
 
     cv::Mat similarities(rows, cols, CV_32F, cv::Scalar(0));
-    cv::Mat responses(1, cols, CV_32F, cv::Scalar(0));
-    for (int i = 0; i < rows; i++) {
-        int index = 0;
-        float highest = 0;
+    cv::Mat maxima(1, cols, CV_32S, cv::Scalar(0));
+
+    for (int i = i0; i < n; i++) {
         for (int j = 0; j < cols; j++) {
-            const InterestRegion &region = regions[i];
-            float value = region(images[j], range);
+            const FeaturePoint &point = features[j];
+            float value = point(images[i], padding);
             similarities.at<float>(i, j) = value;
-            if (highest < value) {
-                highest = value;
-                index = j;
+
+            int l = maxima.at<int>(0, j);
+            if (similarities.at<float>(l, j) < value) {
+                maxima.at<int>(0, j) = i;
             }
         }
+    }
 
-        responses.at<float>(0, index) += 1.0f;
+    cv::Mat responses(rows, 1, CV_32F, cv::Scalar(0));
+    for (int j = 0; j < cols; j++) {
+        int index = maxima.at<int>(0, j);
+        responses.at<float>(index, 0) += 1.0f;
     }
 
     List<cv::Mat> results;

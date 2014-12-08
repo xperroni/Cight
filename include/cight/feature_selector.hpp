@@ -20,7 +20,7 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #ifndef CIGHT_INTEREST_SELECTOR
 #define CIGHT_INTEREST_SELECTOR
 
-#include <cight/interest_region.hpp>
+#include <cight/feature_point.hpp>
 
 #include <clarus/core/list.hpp>
 
@@ -35,7 +35,7 @@ namespace cight {
     Selector functions receive a BGR image and padding length as input, and output a
     list of square interest regions of side <tt>2 * padding + 1</tt>.
     */
-    typedef boost::function<clarus::List<InterestRegion>(const cv::Mat&, int padding)> Selector;
+    typedef boost::function<clarus::List<FeaturePoint>(const cv::Mat&, int padding)> Selector;
 
     /**
     \brief Enforces an upper limit on the number of returned interest regions.
@@ -43,7 +43,7 @@ namespace cight {
     If the number of interest regions returned by the given selector is greater than
     \c limit, excess regions are removed from the end of the list to make it fit.
     */
-    clarus::List<InterestRegion> selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding);
+    clarus::List<FeaturePoint> selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding);
 
     /**
     \brief Filters selected interest regions by distance from the image center.
@@ -52,12 +52,12 @@ namespace cight {
     <tt>(int) (regions.size() * ratio)</tt> interest regions most distant from the
     image's center are selected and returned.
     */
-    clarus::List<InterestRegion> selectBorders(Selector selector, float ratio, const cv::Mat &bgr, int padding);
+    clarus::List<FeaturePoint> selectBorders(Selector selector, float ratio, const cv::Mat &bgr, int padding);
 
     /**
     \brief Select interest regions based on strong corners.
     */
-    clarus::List<InterestRegion> selectGoodFeatures(
+    clarus::List<FeaturePoint> selectGoodFeatures(
         cv::GoodFeaturesToTrackDetector &detector,
         const cv::Mat &bgr,
         int padding
@@ -67,7 +67,7 @@ namespace cight {
     \brief Select interest regions based on saturation (the S channel of the HLS color
            space) outliers over the image.
     */
-    clarus::List<InterestRegion> selectSaturation(const cv::Mat &bgr, int padding);
+    clarus::List<FeaturePoint> selectSaturation(const cv::Mat &bgr, int padding);
 }
 
 #endif
