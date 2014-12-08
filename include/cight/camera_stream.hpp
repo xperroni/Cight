@@ -39,6 +39,9 @@ class cight::CameraStream: public SensorStream {
     /** \brief Object used to replay a video file. */
     clarus::Camera camera;
 
+    /** \brief How many frames to discard for every frame returned. */
+    const int sampling;
+
 public:
     /**
     \brief Creates a new sensor stream connected to a video camera.
@@ -46,8 +49,12 @@ public:
     \param index Index of the underlying camera. Default is 0 (the first camera found in the USB hub).
 
     \param fps Frames per second setting for the camera. Default is 20 FPS.
+
+    \param spacing How many camera frames are discarded for each frame returned.
+
+    \param recording If given, a path to a video file where camera input will be recorded.
     */
-    CameraStream(int index = 0, double fps = 20);
+    CameraStream(int index = 0, double fps = 20, int spacing = 0, const std::string &recording = "");
 
     /**
     \brief Virtual destructor. Enforces polymorphism. Do not remove.

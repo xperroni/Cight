@@ -20,10 +20,13 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #include <cight/camera_stream.hpp>
 using cight::CameraStream;
 
-CameraStream::CameraStream(int index, double fps):
-    camera(index, fps)
+CameraStream::CameraStream(int index, double fps, int spacing, const std::string &recording):
+    camera(index, fps),
+    sampling(spacing)
 {
-    // Nothing to do.
+    if (recording != "") {
+        camera.record(recording);
+    }
 }
 
 CameraStream::~CameraStream() {
@@ -31,7 +34,14 @@ CameraStream::~CameraStream() {
 }
 
 cv::Mat CameraStream::operator () () {
-    return camera.next();
+    cv::Mat frame = camera.next();
+
+    // Discard the appropriate number of frames as per the configured sampling.
+    for (int i = 0; i < sampling && more(); i++) {
+        camera.next();
+    }
+
+    return frame;
 }
 
 bool CameraStream::more() const {
