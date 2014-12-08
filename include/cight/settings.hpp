@@ -21,11 +21,11 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #define CIGHT_SETTINGS_HPP
 
 // Uncomment this flag to enable various GUI diagnostic windows.
-#define DIAGNOSTICS
+//#define DIAGNOSTICS
 
 // Time parameter for cv::waitKey() calls, in milliseconds. Define as an empty
 // macro to enable indefinite wait for user confirmation.
-#define WAIT_KEY_MS 1000
+#define WAIT_KEY_MS 200
 //#define WAIT_KEY_MS
 
 #ifdef DIAGNOSTICS
