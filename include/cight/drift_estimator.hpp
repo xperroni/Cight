@@ -3,6 +3,7 @@
 
 #include <cight/memory.hpp>
 #include <cight/stream_matcher.hpp>
+#include <cight/settings.hpp>
 
 #include <clarus/core/list.hpp>
 
@@ -17,7 +18,7 @@ class cight::Estimator {
 
     Memory replay;
 
-    StreamMatcher::P matcher;
+    StreamMatcher matcher;
 
     int bins;
 
@@ -27,7 +28,7 @@ public:
     /*
     Creates a new drift estimator, using the giving folder for storage.
     */
-    Estimator(int bins, int window, size_t range, StreamMatcher::P matcher);
+    Estimator(int bins, int window, size_t range, StreamMatcher matcher);
 
     /*
     Virtual destructor. Enforces polymorphism. Do not remove.
@@ -44,11 +45,6 @@ public:
     call.
     */
     void reset();
-
-    /*
-    Returns whether the current estimated position is the last known one.
-    */
-    bool more() const;
 };
 
 #endif

@@ -28,11 +28,37 @@ using clarus::List;
 #include <clarus/vision/colors.hpp>
 #include <clarus/vision/fourier.hpp>
 
+#ifdef DIAGNOSTICS
+    #include <clarus/core/types.hpp>
+    #include <clarus/io/viewer.hpp>
+    #include <clarus/vision/colors.hpp>
+    #include <clarus/vision/depths.hpp>
+    #include <clarus/vision/filters.hpp>
+    #include <clarus/vision/images.hpp>
+    #include <iostream>
+
+    static void displayDiVS(const cv::Mat &teach, cv::Mat &replay) {
+        static cv::Scalar RED(0, 0, 255);
+
+        static int index = 0;
+
+        cv::Mat bgr_teach = depths::bgr(teach);
+        cv::Mat bgr_replay = depths::bgr(replay);
+        images::save(bgr_teach, "divs-teach-" + types::to_string(index) + ".png");
+        images::save(bgr_replay, "divs-replay-" + types::to_string(index++) + ".png");
+        viewer::show("DiVS (Teach)", bgr_teach);
+        viewer::show("DiVS (Replay)", bgr_replay);
+        cv::waitKey(WAIT_KEY_MS);
+    }
+#else
+    #define displayDiVS(A, B)
+#endif
+
 inline cv::Mat preprocess(const cv::Mat &image) {
     return colors::grayscale(cight::upper_half(image));
 }
 
-Estimator::Estimator(int _bins, int _window, size_t range, StreamMatcher::P _matcher):
+Estimator::Estimator(int _bins, int _window, size_t range, StreamMatcher _matcher):
     teach(range),
     replay(range),
     bins(_bins),
@@ -48,18 +74,23 @@ Estimator::~Estimator() {
 
 cv::Mat Estimator::operator () () {
     do {
-        if (!more()) {
-            break;
+        List<cv::Mat> matched = matcher();
+        if (matched.empty()) {
+            return cv::Mat();
         }
 
-        List<cv::Mat> matched = matcher();
-        teach.record(preprocess(matched[0]));
-        replay.record(preprocess(matched[1]));
+        replay.record(preprocess(matched[0]));
+        teach.record(preprocess(matched[1]));
     }
     while (teach.idle() > 0);
 
-    cv::Mat teachVector = column_histogram(change_average(teach), bins);
-    cv::Mat replayVector = column_histogram(change_average(replay), bins);
+    cv::Mat teachMap = change_average(teach);
+    cv::Mat replayMap = change_average(replay);
+
+    displayDiVS(teachMap, replayMap);
+
+    cv::Mat teachVector = column_histogram(teachMap, bins);
+    cv::Mat replayVector = column_histogram(replayMap, bins);
 
     int n = teachVector.cols;
     cv::Mat responses(1, n * 2, CV_64F, cv::Scalar::all(0));
@@ -76,8 +107,4 @@ cv::Mat Estimator::operator () () {
 void Estimator::reset() {
     teach.clear();
     replay.clear();
-}
-
-bool Estimator::more() const {
-    return matcher->more();
 }
