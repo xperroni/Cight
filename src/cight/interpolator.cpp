@@ -18,10 +18,43 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <cight/interpolator.hpp>
+
+#include <clarus/core/list.hpp>
 using clarus::List;
 
 #include <clarus/core/math.hpp>
 #include <clarus/vision/images.hpp>
+
+cv::Point cight::lineP0(float x, float y, float t) {
+    float yd = y - t * x;
+    if (yd >= 0) {
+        return cv::Point(0, yd);
+    }
+    else {
+        return cv::Point(-yd / t, 0);
+    }
+}
+
+cv::Point cight::lineP0(const cv::Point3f &line) {
+    return lineP0(line.x, line.y, line.z);
+}
+
+cv::Point cight::linePn(float x, float y, float t, const cv::Size &size) {
+    float xn = size.width - 1;
+    float yn = size.height - 1;
+    float yd = yn - y;
+    float xd = x + yd / t;
+    if (xd <= xn) {
+        return cv::Point(xd, yn);
+    }
+    else {
+        return cv::Point(xn, y + (xn - x) * t);
+    }
+}
+
+cv::Point cight::linePn(const cv::Point3f &line, const cv::Size &size) {
+    return linePn(line.x, line.y, line.z, size);
+}
 
 static List<float> bestSlide(const cv::Mat &costs) {
     int rows = costs.rows;
@@ -51,57 +84,37 @@ static List<float> bestSlide(const cv::Mat &costs) {
         }
     }
 
-    List<float> results;
-    results.append(a);
-    results.append(b);
-    results.append(d);
-    return results;
+    List<float> result;
+    result.append(a);
+    result.append(b);
+    result.append(d);
+    return result;
 }
 
-List<cv::Point> cight::interpolateSlide(const cv::Mat &similarities) {
+cv::Point3f cight::interpolateSlide(const cv::Mat &similarities) {
     cv::Mat costs = clarus::max(similarities) - similarities;
     List<float> bestX = bestSlide(costs);
     List<float> bestY = bestSlide(costs.t());
 
     List<cv::Point> points;
     if (bestX[2] < bestY[2]) {
-        int yn = similarities.rows - 1;
-        points.append(cv::Point(bestX[0], 0));
-        points.append(cv::Point(bestX[1], yn));
+        float x0 = bestX[0];
+        float xn = bestX[1];
+        float yd = similarities.rows;
+        float t = yd / (xn - x0);
+        return cv::Point3f(x0, 0, t);
     }
     else {
+        float xd = similarities.cols;
+        float y0 = bestY[0];
+        float yn = bestY[1];
+        float t = (yn - y0) / xd;
         int xn = similarities.cols;
-        points.append(cv::Point(0, bestY[0]));
-        points.append(cv::Point(xn, bestY[1]));
-    }
-
-    return points;
-}
-
-static cv::Point lineP0(double tan, double x2, double y2) {
-    double yd = y2 - tan * x2;
-    if (yd >= 0) {
-        return cv::Point(0, yd);
-    }
-    else {
-        return cv::Point(-yd / tan, 0);
+        return cv::Point3f(0, y0, t);
     }
 }
 
-static cv::Point linePn(double tan, double x2, double y2, const cv::Size &size) {
-    double xn = size.width - 1;
-    double yn = size.height - 1;
-    double yd = yn - y2;
-    double xd = x2 + yd / tan;
-    if (xd <= xn) {
-        return cv::Point(xd, yn);
-    }
-    else {
-        return cv::Point(xn, y2 + (xn - x2) * tan);
-    }
-}
-
-List<cv::Point> cight::interpolateHough(const cv::Mat &similarities) {
+cv::Point3f cight::interpolateHough(const cv::Mat &similarities) {
     int rows = similarities.rows;
     int cols = similarities.cols;
 
@@ -115,22 +128,22 @@ List<cv::Point> cight::interpolateHough(const cv::Mat &similarities) {
     }
 
     cv::Point p0;
-    cv::Point pn;
+    float t = 0;
     float best = 0;
     for (int i = 0, n = lines.size(); i < n; i++) {
         const cv::Vec4i &line = lines[i];
-        double x1 = line[0];
-        double y1 = line[1];
-        double x2 = line[2];
-        double y2 = line[3];
+        float x1 = line[0];
+        float y1 = line[1];
+        float x2 = line[2];
+        float y2 = line[3];
 
         if (x2 - x1 <= 0 || y2 - y1 <= 0) {
             continue;
         }
 
-        double tan = (y2 - y1) / (x2 - x1);
-        cv::Point a = lineP0(tan, x2, y2);
-        cv::Point b = linePn(tan, x2, y2, similarities.size());
+        float tan = (y2 - y1) / (x2 - x1);
+        cv::Point a = lineP0(x2, y2, tan);
+        cv::Point b = linePn(x2, y2, tan, similarities.size());
         cv::Mat mask(rows, cols, CV_8U, cv::Scalar(0));
         cv::line(mask, a, b, cv::Scalar(255));
 
@@ -139,13 +152,10 @@ List<cv::Point> cight::interpolateHough(const cv::Mat &similarities) {
         float total = cv::sum(selected)[0];
         if (total > best) {
             best = total;
+            t = tan;
             p0 = a;
-            pn = b;
         }
     }
 
-    List<cv::Point> points;
-    points.append(p0);
-    points.append(pn);
-    return points;
+    return cv::Point3f(p0.x, p0.y, t);
 }

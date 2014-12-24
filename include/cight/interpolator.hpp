@@ -20,8 +20,6 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #ifndef CIGHT_INTERPOLATOR_HPP
 #define CIGHT_INTERPOLATOR_HPP
 
-#include <clarus/core/list.hpp>
-
 #include <boost/function.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -30,19 +28,40 @@ namespace cight {
     /**
     \brief Type of functions that interpolate a match line over a similarity map.
 
-    The line is returned as a pair of points.
+    The line is returned as a 3D point <tt>(x0, y0, t)</tt>, where
+    <tt>y = (x - x0)t + y0 &forall; x &ge; x0</tt> .
     */
-    typedef boost::function<clarus::List<cv::Point>(const cv::Mat&)> Interpolator;
+    typedef boost::function<cv::Point3f(const cv::Mat&)> Interpolator;
+
+    /**
+    \brief Returns the first point for the given line such that <tt>x &ge; 0</tt> and <tt>y &ge; 0</tt> .
+    */
+    cv::Point lineP0(float x, float y, float t);
+
+    /**
+    \brief Returns the first point for the given line such that <tt>x &ge; 0</tt> and <tt>y &ge; 0</tt> .
+    */
+    cv::Point lineP0(const cv::Point3f &line);
+
+    /**
+    \brief Returns the last point for the given line that falls within the given size.
+    */
+    cv::Point linePn(float x, float y, float t, const cv::Size &size);
+
+    /**
+    \brief Returns the last point for the given line that falls within the given size.
+    */
+    cv::Point linePn(const cv::Point3f &line, const cv::Size &size);
 
     /**
     \brief Brute-force interpolator.
     */
-    clarus::List<cv::Point> interpolateSlide(const cv::Mat &similarities);
+    cv::Point3f interpolateSlide(const cv::Mat &similarities);
 
     /**
     \brief Hough transform-based interpolator.
     */
-    clarus::List<cv::Point> interpolateHough(const cv::Mat &similarities);
+    cv::Point3f interpolateHough(const cv::Mat &similarities);
 }
 
 #endif
