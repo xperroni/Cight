@@ -35,14 +35,19 @@ namespace cight {
 /**
 \brief Sensor stream that replays a recorded video file.
 */
-class cight::VideoStream: public SensorStream {
+class cight::VideoStream {
     /** \brief Object used to replay a video file. */
     clarus::Video recording;
 
     /** \brief How many frames to discard for every frame returned. */
-    const int sampling;
+    int sampling;
 
 public:
+    /**
+    \brief Default constructor.
+    */
+    VideoStream();
+
     /**
     \brief Creates a new sensor stream replay from the video file at the given path.
 
@@ -59,9 +64,6 @@ public:
 
     // See cight::SensorStream::operator () ()
     virtual cv::Mat operator () ();
-
-    // See cight::SensorStream::more()
-    virtual bool more() const;
 };
 
 #endif

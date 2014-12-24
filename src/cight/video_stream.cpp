@@ -20,6 +20,10 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #include <cight/video_stream.hpp>
 using cight::VideoStream;
 
+VideoStream::VideoStream() {
+    // Nothing to do.
+}
+
 VideoStream::VideoStream(const std::string &path, int spacing):
     recording(path),
     sampling(spacing)
@@ -32,6 +36,10 @@ VideoStream::~VideoStream() {
 }
 
 cv::Mat VideoStream::operator () () {
+    if (!recording.more()) {
+        return cv::Mat();
+    }
+
     cv::Mat frame = recording.next();
 
     // Discard the appropriate number of frames as per the configured sampling.
@@ -40,8 +48,4 @@ cv::Mat VideoStream::operator () () {
     }
 
     return frame;
-}
-
-bool VideoStream::more() const {
-    return recording.more();
 }
