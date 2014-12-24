@@ -25,6 +25,7 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #include <cight/interpolator.hpp>
 #include <cight/memory.hpp>
 #include <cight/sensor_stream.hpp>
+#include <cight/settings.hpp>
 #include <cight/stream_matcher.hpp>
 
 #include <clarus/core/list.hpp>
@@ -33,12 +34,12 @@ namespace cight {
     class VisualMatcher;
 }
 
-class cight::VisualMatcher: public StreamMatcher {
+class cight::VisualMatcher {
     /** \brief Teach (pre-recorded) video stream. */
-    SensorStream::P teachStream;
+    SensorStream teachStream;
 
     /** \brief Replay (real-time) video stream. */
-    SensorStream::P replayStream;
+    SensorStream replayStream;
 
     /** \brief Memory buffer for unadulterated teach stream frames. */
     clarus::List<cv::Mat> teachFrames;
@@ -49,7 +50,7 @@ class cight::VisualMatcher: public StreamMatcher {
     /** \brief Memory buffer for replay stream frames. */
     clarus::List<cv::Mat> replayFrames;
 
-    /** \brief Memory buffer for replay stream interest maps. */
+    /** \brief Memory buffer for replay stream feature maps. */
     clarus::List<FeatureMap> replayMaps;
 
     /** \brief Function used to select interest regions. */
@@ -61,9 +62,6 @@ class cight::VisualMatcher: public StreamMatcher {
     /** \brief Additional padding to search for good matches. */
     int padding_b;
 
-    /** \brief Range around the current teach image to search for matches. */
-    int padding_c;
-
     /** \brief Function used to interpolate a stream matching line over the current similarity map. */
     Interpolator interpolator;
 
@@ -73,30 +71,42 @@ class cight::VisualMatcher: public StreamMatcher {
     /** \brief Index of the next matching to return. */
     int index;
 
-    /** \brief First match for the current similarity matrix. */
-    cv::Point p0;
+    /** \brief Index of the first teach image to be paired up. */
+    float teach0;
 
-    /** \brief Ratio used to compute matches after the first. */
-    float tan;
+    /** \brief Index of the first replay image to be paired up. */
+    float replay0;
 
-    /** \brief Last matched replay frame. */
-    int yn;
+    /** \brief Slope of the line defining the initial image pairing. */
+    float slope;
+
+    /** \brief Local matching range for images beyond the original similarity map computation. */
+    float slit;
 
     /**
     \brief Read a frame from the teach stream.
 
     Lists containing teach frame data are updated, and older frames discarded as appropriate.
+
+    Returns whether a new frame was successfully retrieved.
     */
-    void readTeachStream();
+    bool readTeachStream();
 
     /**
     \brief Read a frame from the replay stream.
 
     Lists containing replay frame data are updated, and older frames discarded as appropriate.
+
+    Returns whether a new frame was successfully retrieved.
     */
-    void readReplayStream();
+    bool readReplayStream();
 
 public:
+    /**
+    \brief Default constructor.
+    */
+    VisualMatcher();
+
     /**
     \brief Creates a new stream matcher.
 
@@ -104,9 +114,7 @@ public:
 
     \param replay Replay (real-time) video stream.
 
-    \param window Size of the memory buffers for teach and replay streams.
-
-    \param interpolator Function used to interpolate a stream matching line over the current similarity map.
+    \param window Size of the memory buffers for teach (height) and replay (width) streams.
 
     \param selector Function used to select interest regions.
 
@@ -114,33 +122,39 @@ public:
 
     \param padding_b Additional padding for teach image patches.
 
-    \param padding_c Padding around the current teach image to search for matches.
+    \param interpolator Function used to interpolate a stream matching line over the current similarity map.
     */
     VisualMatcher(
-        SensorStream::P teach,
-        SensorStream::P replay,
-        int window,
-        Interpolator interpolator,
+        SensorStream teach,
+        SensorStream replay,
+        const cv::Size &window,
         Selector selector,
         int padding_a,
         int padding_b,
-        int padding_c
+        Interpolator interpolator
     );
 
-    // See cight::StreamMatcher::operator() ()
+    // See cight::StreamMatcher
     clarus::List<cv::Mat> operator() ();
 
-    // See cight::StreamMatcher::fillReplayBuffer()
-    virtual void fillReplayBuffer();
+    /**
+    \brief Fills the teach stream buffer.
+    */
+    void fillTeachBuffer();
 
-    // See cight::StreamMatcher::fillTeachBuffer()
-    virtual void fillTeachBuffer();
+    /**
+    \brief Fills the replay stream buffer.
+    */
+    void fillReplayBuffer();
 
-    // See cight::StreamMatcher::computeMatching()
-    virtual void computeMatching();
+    /**
+    \brief Compute an initial matching between streams.
 
-    // See cight::StreamMatcher::more()
-    bool more() const;
+    This method automatically calls \c fillTeachBuffer() and \c fillReplayBuffer()
+    if the respective buffers are not yet full. After the first call, computed
+    parameters are automatically updated as required.
+    */
+    void computeMatching();
 };
 
 #endif

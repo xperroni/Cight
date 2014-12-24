@@ -21,25 +21,92 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 using cight::VisualMatcher;
 using clarus::List;
 
-#include <clarus/io/viewer.hpp>
-#include <clarus/vision/depths.hpp>
-#include <clarus/vision/images.hpp>
-
+#include <clarus/core/math.hpp>
 #include <clarus/vision/colors.hpp>
 #include <clarus/vision/filters.hpp>
 
-#include <iostream>
-#include <fstream>
+#ifdef DIAGNOSTICS
+    #include <clarus/core/types.hpp>
+    #include <clarus/io/viewer.hpp>
+    #include <clarus/vision/depths.hpp>
+    #include <clarus/vision/images.hpp>
+
+    #include <iostream>
+    #include <fstream>
+
+    static void displayImagePairs(const List<cv::Mat> &images) {
+        viewer::show("Replay", images[0]);
+        viewer::show("Teach", images[1]);
+        char key = cv::waitKey(500);
+        if (key == 'p') {
+            do {
+                key = cv::waitKey(1000);
+            }
+            while (key != 'p');
+        }
+    }
+
+    static void displayMatches(const cv::Mat &matches) {
+        static int index = 0;
+
+        cv::Mat bgr = images::scale(depths::bgr(matches), cv::Size(300, 300), cv::INTER_NEAREST);
+        viewer::show("Matches", bgr);
+        images::save(bgr, "matches-" + types::to_string(index++) + ".png");
+        cv::waitKey(WAIT_KEY_MS);
+    }
+
+    static void displaySimilarities(const cv::Mat &similarities, const cv::Point3f &line, int slit) {
+        std::ofstream file("line.txt");
+        file << "(" << line << ", " << slit << ")" << std::endl;
+        std::cerr << "(" << line << ", " << slit << ")" << std::endl;
+
+        cv::Mat bgr = depths::bgr(similarities);
+        cv::Point p0 = cight::lineP0(line);
+        cv::Point p1 = cight::linePn(line, bgr.size());
+
+        cv::line(bgr, p0, p1, cv::Scalar(0, 0, 0));
+        viewer::show("Similarities", images::scale(bgr, cv::Size(300, 300)));
+        depths::save(similarities, "similarities.txt");
+        cv::waitKey(WAIT_KEY_MS);
+    }
+
+    static void displayResponses(std::ostream &out, int x0, int y0, int i, float slope, const cv::Mat &responses) {
+        out
+            << "("
+            << "(" << x0 << ", " << y0 << ", " << i << ", " << slope << ")"
+            << ", "
+            << responses.t()
+            << ")" << std::endl
+        ;
+    }
+
+    static void displayResponses(int x0, int y0, int i, float slope, const cv::Mat &responses) {
+        std::ofstream file("similarities_extra.txt", std::ios_base::out | std::ios_base::app);
+        displayResponses(std::cerr, x0, y0, i, slope, responses);
+        displayResponses(file, x0, y0, i, slope, responses);
+    }
+#else
+    #define displayImagePairs(PAIR)
+
+    #define displayMatches(A)
+
+    #define displaySimilarities(A, B)
+
+    #define displayResponses(X, Y, R)
+#endif
+
+VisualMatcher::VisualMatcher() {
+    // Nothing to do.
+}
 
 VisualMatcher::VisualMatcher(
-    SensorStream::P teach,
-    SensorStream::P replay,
-    const int window,
-    Interpolator _interpolator,
+    SensorStream teach,
+    SensorStream replay,
+    const cv::Size &window,
     Selector _selector,
     int _padding_a,
     int _padding_b,
-    int _padding_c
+    Interpolator _interpolator
 ):
     teachStream(teach),
     replayStream(replay),
@@ -50,23 +117,23 @@ VisualMatcher::VisualMatcher(
     selector(_selector),
     padding_a(_padding_a),
     padding_b(_padding_b),
-    padding_c(_padding_c),
     interpolator(_interpolator),
-    similarities(window, window, CV_32F, cv::Scalar(0)),
+    similarities(window, CV_32F, cv::Scalar(0)),
     index(-1),
-    p0(0, 0),
-    tan(0),
-    yn(0)
+    teach0(0),
+    replay0(0),
+    slope(0),
+    slit(0)
 {
     // Nothing to do.
 }
 
-void VisualMatcher::readTeachStream() {
-    if (!teachStream->more()) {
-        return;
+bool VisualMatcher::readTeachStream() {
+    cv::Mat frame = teachStream();
+    if (frame.empty()) {
+        return false;
     }
 
-    cv::Mat frame = teachStream();
     cv::Mat edges = filter::sobel(colors::grayscale(frame));
     teachFrames.append(frame);
     teachEdges.append(edges);
@@ -75,14 +142,16 @@ void VisualMatcher::readTeachStream() {
         teachFrames.remove(0);
         teachEdges.remove(0);
     }
+
+    return true;
 }
 
-void VisualMatcher::readReplayStream() {
-    if (!replayStream->more()) {
-        return;
+bool VisualMatcher::readReplayStream() {
+    cv::Mat frame = replayStream();
+    if (frame.empty()) {
+        return false;
     }
 
-    cv::Mat frame = replayStream();
     FeatureMap features(selector, frame, padding_a);
     replayFrames.append(frame);
     replayMaps.append(features);
@@ -91,38 +160,57 @@ void VisualMatcher::readReplayStream() {
         replayFrames.remove(0);
         replayMaps.remove(0);
     }
+
+    return true;
 }
+
+#define teachIndex(INDEX) (teach0 + ((INDEX) - replay0) * slope)
 
 clarus::List<cv::Mat> VisualMatcher::operator() () {
     if (index == -1) {
         computeMatching();
     }
-    else if (index == yn) {
-        readReplayStream();
-        readTeachStream();
-        //computeSimilarityMap();
-        index = yn;
-    }
-    else {
-        index++;
-    }
 
-    int rows = similarities.rows;
-    int matched = std::min(rows - 1, (int) (index * tan));
-    while (matched >= teachFrames.size()) {
-        readReplayStream();
-        readTeachStream();
+    int matched = teachIndex(index);
+    for (int i = 0, n = matched + slit - similarities.rows; i < n; i++) {
+        if (!readTeachStream()) {
+            return List<cv::Mat>();
+        }
+
+        teach0--;
         matched--;
-        index--;
     }
 
-    viewer::show("Teach", teachFrames.at(matched), 0, 0);
-    viewer::show("Replay", replayFrames.at(index), 650, 0);
-    cv::waitKey(200);
+    if (index >= similarities.cols) {
+        if (!readReplayStream()) {
+            return List<cv::Mat>();
+        }
+
+        replay0--;
+
+        index = replayMaps.size() - 1;
+        int i0 = std::max((int) (matched - slit), 0);
+        int in = std::min((int) (matched + slit), (int) teachEdges.size());
+
+        const FeatureMap &features = replayMaps.at(index);
+        List<cv::Mat> results = features(teachEdges, padding_b, i0, in);
+        const cv::Mat &responses = results[0];
+        displayMatches(results[1]);
+
+        matched = std::max(clarus::argmax(responses).y, (int) ceil(teachIndex(index - 1)));
+        slope = (matched - teach0) / (index - replay0);
+
+        displayResponses(teach0, replay0, matched, slope, responses);
+    }
 
     List<cv::Mat> frames;
-    frames.append(teachFrames.at(matched));
     frames.append(replayFrames.at(index));
+    frames.append(teachFrames.at(matched));
+
+    index++;
+
+    displayImagePairs(frames);
+
     return frames;
 }
 
@@ -140,6 +228,40 @@ void VisualMatcher::fillReplayBuffer() {
     }
 }
 
+inline float computeSlit(const cv::Mat &similarities, const cv::Point3f &line) {
+    int rows = similarities.rows;
+    int cols = similarities.cols;
+    float replay0 = line.x;
+    float teach0 = line.y;
+    float slope = line.z;
+
+    int rl = 0;
+    int rh = 0;
+
+    for (int j = replay0; j < cols; j++) {
+        int ic = teach0 + (j - replay0) * slope;
+
+        int il = 0;
+        for (int i = 1; ic - i >= 0; i++) {
+            if (similarities.at<float>(ic - i, j) > 0) {
+                il = i;
+            }
+        }
+
+        int ih = 0;
+        for (int i = 0; ic + i < rows; i++) {
+            if (similarities.at<float>(ic + i, j) > 0) {
+                ih = i;
+            }
+        }
+
+        rl = std::max(rl, il);
+        rh = std::max(rh, ih);
+    }
+
+    return (rl + rh) / 2;
+}
+
 void VisualMatcher::computeMatching() {
     fillTeachBuffer();
     fillReplayBuffer();
@@ -149,37 +271,21 @@ void VisualMatcher::computeMatching() {
     for (int j = 0; j < cols; j++) {
         std::cerr << "Processing replay image #" << j << std::endl;
         const FeatureMap &features = replayMaps.at(j);
-        int i0 = (padding_c != 0 ? std::max(j - padding_c, 0) : 0);
-        int in = (padding_c != 0 ? std::min(j + padding_c, rows) : 0);
-
-        List<cv::Mat> results = features(teachEdges, padding_b, i0, in);
+        List<cv::Mat> results = features(teachEdges, padding_b);
         const cv::Mat &responses = results[0];
+        displayMatches(results[1]);
         cv::Rect roi(j, 0, 1, rows);
         cv::Mat column(similarities, roi);
         responses.copyTo(column);
     }
 
-    List<cv::Point> line = interpolator(similarities);
-    std::cerr << line << std::endl;
+    cv::Point3f line = interpolator(similarities);
 
-    cv::Point &p1 = line[1];
-    p0 = line[0];
-    yn = p1.y;
+    index = line.x;
+    replay0 = line.x;
+    teach0 = line.y;
+    slope = line.z;
+    slit = computeSlit(similarities, line);
 
-    float dx = p1.x - p0.x;
-    float dy = p1.y - p0.y;
-    tan = dy / dx;
-    index = p0.y;
-
-    std::ofstream file("similarities.txt", std::ios_base::out | std::ios_base::app);
-    cv::Mat bgr = depths::bgr(similarities);
-    cv::line(bgr, p0, p1, cv::Scalar(0, 0, 0));
-    viewer::show("Similarities", images::scale(bgr, cv::Size(300, 300)));
-    depths::save(similarities, file);
-    file << std::endl;
-    cv::waitKey(200);
-}
-
-bool VisualMatcher::more() const {
-    return (teachStream->more() && replayStream->more());
+    displaySimilarities(similarities, line, slit);
 }
