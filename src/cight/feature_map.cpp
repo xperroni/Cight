@@ -24,17 +24,24 @@ using cight::FeatureMap;
 #include <map>
 
 #ifdef DIAGNOSTICS
+    #include <clarus/core/types.hpp>
     #include <clarus/io/viewer.hpp>
+    #include <clarus/vision/colors.hpp>
+    #include <clarus/vision/filters.hpp>
+    #include <clarus/vision/images.hpp>
     #include <iostream>
 
     static void display(const cv::Mat &bgr, const List<cight::FeaturePoint> &regions) {
         static cv::Scalar RED(0, 0, 255);
 
-        cv::Mat canvas = bgr.clone();
+        static int index = 0;
+
+        cv::Mat canvas = colors::convert(filter::sobel(colors::grayscale(bgr)), CV_GRAY2BGR);
         for (int i = 0, n = regions.size(); i < n; i++) {
             cv::rectangle(canvas, regions[i].bounds(), RED);
         }
 
+        images::save(canvas, "regions-" + types::to_string(index++) + ".png");
         viewer::show("Interest Regions", canvas);
         cv::waitKey(WAIT_KEY_MS);
     }
@@ -61,7 +68,7 @@ List<cv::Mat> FeatureMap::operator () (const List<cv::Mat> &images, int padding,
     for (int i = i0; i < n; i++) {
         for (int j = 0; j < cols; j++) {
             const FeaturePoint &point = features[j];
-            float value = point(images[i], padding);
+            float value = point(images.at(i), padding);
             similarities.at<float>(i, j) = value;
 
             int l = maxima.at<int>(0, j);
@@ -77,9 +84,5 @@ List<cv::Mat> FeatureMap::operator () (const List<cv::Mat> &images, int padding,
         responses.at<float>(index, 0) += 1.0f;
     }
 
-    List<cv::Mat> results;
-    results.append(responses);
-    results.append(similarities);
-
-    return results;
+    return (List<cv::Mat>(), responses, similarities);
 }
