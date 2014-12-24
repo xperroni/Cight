@@ -20,47 +20,15 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #ifndef CIGHT_SENSOR_STREAM_HPP
 #define CIGHT_SENSOR_STREAM_HPP
 
-#include <boost/smart_ptr.hpp>
+#include <boost/function.hpp>
 
 #include <opencv2/opencv.hpp>
 
 namespace cight {
-    struct SensorStream;
+    /**
+    \brief Abstract superclass for sensor feeds.
+    */
+    typedef boost::function<cv::Mat()> SensorStream;
 }
-
-/**
-\brief Abstract superclass for sensor feeds.
-*/
-struct cight::SensorStream {
-    /** \brief Reference-counted smart pointer type. */
-    struct P: boost::shared_ptr<SensorStream> {
-        P():
-            boost::shared_ptr<SensorStream>()
-        {
-            // Nothing to do.
-        }
-
-        P(SensorStream *p):
-            boost::shared_ptr<SensorStream>(p)
-        {
-            // Nothing to do.
-        }
-
-        cv::Mat operator () () {
-            SensorStream &sensor = *get();
-            return sensor();
-        }
-    };
-
-    /**
-    \brief Returns the current sensor reading.
-    */
-    virtual cv::Mat operator () () = 0;
-
-    /**
-    \brief Returns whether the stream is still active.
-    */
-    virtual bool more() const = 0;
-};
 
 #endif
