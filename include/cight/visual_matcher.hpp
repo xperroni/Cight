@@ -80,9 +80,6 @@ class cight::VisualMatcher {
     /** \brief Slope of the line defining the initial image pairing. */
     float slope;
 
-    /** \brief Local matching range for images beyond the original similarity map computation. */
-    float slit;
-
     /**
     \brief Read a frame from the teach stream.
 
@@ -138,23 +135,9 @@ public:
     clarus::List<cv::Mat> operator() ();
 
     /**
-    \brief Fills the teach stream buffer.
+    \brief Compute the matching trend between streams.
     */
-    void fillTeachBuffer();
-
-    /**
-    \brief Fills the replay stream buffer.
-    */
-    void fillReplayBuffer();
-
-    /**
-    \brief Compute an initial matching between streams.
-
-    This method automatically calls \c fillTeachBuffer() and \c fillReplayBuffer()
-    if the respective buffers are not yet full. After the first call, computed
-    parameters are automatically updated as required.
-    */
-    void computeMatching();
+    bool computeMatching();
 };
 
 #endif

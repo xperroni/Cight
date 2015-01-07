@@ -55,35 +55,26 @@ using clarus::List;
         cv::waitKey(WAIT_KEY_MS);
     }
 
-    static void displaySimilarities(const cv::Mat &similarities, const cv::Point3f &line, int slit) {
-        std::ofstream file("line.txt");
-        file << "(" << line << ", " << slit << ")" << std::endl;
-        std::cerr << "(" << line << ", " << slit << ")" << std::endl;
+    static void displaySimilarities(const cv::Mat &similarities, const cv::Point3f &line) {
+        std::cerr << line << std::endl;
 
         cv::Mat bgr = depths::bgr(similarities);
         cv::Point p0 = cight::lineP0(line);
         cv::Point p1 = cight::linePn(line, bgr.size());
 
         cv::line(bgr, p0, p1, cv::Scalar(0, 0, 0));
-        viewer::show("Similarities", images::scale(bgr, cv::Size(300, 300)));
-        depths::save(similarities, "similarities.txt");
+        viewer::show("Similarities", images::scale(bgr, cv::Size(300, 300), cv::INTER_NEAREST));
         cv::waitKey(WAIT_KEY_MS);
     }
 
-    static void displayResponses(std::ostream &out, int x0, int y0, int i, float slope, const cv::Mat &responses) {
-        out
-            << "("
-            << "(" << x0 << ", " << y0 << ", " << i << ", " << slope << ")"
-            << ", "
-            << responses.t()
-            << ")" << std::endl
-        ;
+    static void recordResponses(const cv::Mat &responses) {
+        std::ofstream similarities("similarities.txt", std::ios_base::out | std::ios_base::app);
+        similarities << responses.t() << std::endl;
     }
 
-    static void displayResponses(int x0, int y0, int i, float slope, const cv::Mat &responses) {
-        std::ofstream file("similarities_extra.txt", std::ios_base::out | std::ios_base::app);
-        displayResponses(std::cerr, x0, y0, i, slope, responses);
-        displayResponses(file, x0, y0, i, slope, responses);
+    static void recordLines(const cv::Point3f &line) {
+        std::ofstream lines("lines.txt", std::ios_base::out | std::ios_base::app);
+        lines << line << std::endl;
     }
 #else
     #define displayImagePairs(PAIR)
@@ -92,7 +83,9 @@ using clarus::List;
 
     #define displaySimilarities(A, B)
 
-    #define displayResponses(X, Y, R)
+    #define recordResponses(A)
+
+    #define recordLines(A, B)
 #endif
 
 VisualMatcher::VisualMatcher() {
@@ -122,10 +115,18 @@ VisualMatcher::VisualMatcher(
     index(-1),
     teach0(0),
     replay0(0),
-    slope(0),
-    slit(0)
+    slope(0)
 {
     // Nothing to do.
+}
+
+inline cv::Mat color_diff(const cv::Mat &bgr) {
+    List<cv::Mat> channels = colors::channels(bgr);
+    cv::Mat b = images::convert(channels[0], CV_16S);
+    cv::Mat g = images::convert(channels[1], CV_16S);
+    cv::Mat r = images::convert(channels[2], CV_16S);
+
+    return images::convert(cv::abs(b - g) + cv::abs(g - r) + cv::abs(r - b), CV_8U);
 }
 
 bool VisualMatcher::readTeachStream() {
@@ -134,8 +135,10 @@ bool VisualMatcher::readTeachStream() {
         return false;
     }
 
-    cv::Mat edges = filter::sobel(colors::grayscale(frame));
-    teachFrames.append(frame);
+    cv::Mat grays = color_diff(frame);
+    teachFrames.append(grays);
+
+    cv::Mat edges = filter::sobel(grays);
     teachEdges.append(edges);
 
     if (teachFrames.size() > similarities.rows) {
@@ -152,8 +155,10 @@ bool VisualMatcher::readReplayStream() {
         return false;
     }
 
-    FeatureMap features(selector, frame, padding_a);
-    replayFrames.append(frame);
+    cv::Mat grays = color_diff(frame);
+    replayFrames.append(grays);
+
+    FeatureMap features(selector, grays, padding_a);
     replayMaps.append(features);
 
     if (replayFrames.size() > similarities.cols) {
@@ -167,41 +172,24 @@ bool VisualMatcher::readReplayStream() {
 #define teachIndex(INDEX) (teach0 + ((INDEX) - replay0) * slope)
 
 clarus::List<cv::Mat> VisualMatcher::operator() () {
-    if (index == -1) {
-        computeMatching();
-    }
-
-    int matched = teachIndex(index);
-    for (int i = 0, n = matched + slit - similarities.rows; i < n; i++) {
-        if (!readTeachStream()) {
-            return List<cv::Mat>();
-        }
-
-        teach0--;
-        matched--;
+    if (index == -1 && computeMatching() == false) {
+        return List<cv::Mat>();
     }
 
     if (index >= similarities.cols) {
-        if (!readReplayStream()) {
+        teachFrames.remove(0);
+        replayFrames.remove(0);
+        teachEdges.remove(0);
+        replayMaps.remove(0);
+
+        if (computeMatching() == false) {
             return List<cv::Mat>();
         }
 
-        replay0--;
-
-        index = replayMaps.size() - 1;
-        int i0 = std::max((int) (matched - slit), 0);
-        int in = std::min((int) (matched + slit), (int) teachEdges.size());
-
-        const FeatureMap &features = replayMaps.at(index);
-        List<cv::Mat> results = features(teachEdges, padding_b, i0, in);
-        const cv::Mat &responses = results[0];
-        displayMatches(results[1]);
-
-        matched = std::max(clarus::argmax(responses).y, (int) ceil(teachIndex(index - 1)));
-        slope = (matched - teach0) / (index - replay0);
-
-        displayResponses(teach0, replay0, matched, slope, responses);
+        index = similarities.cols - 1;
     }
+
+    int matched = teachIndex(index);
 
     List<cv::Mat> frames;
     frames.append(replayFrames.at(index));
@@ -214,65 +202,33 @@ clarus::List<cv::Mat> VisualMatcher::operator() () {
     return frames;
 }
 
-void VisualMatcher::fillTeachBuffer() {
-    int rows = similarities.rows;
-    for (int i = teachFrames.size(); i < rows; i++) {
-        readTeachStream();
-    }
-}
-
-void VisualMatcher::fillReplayBuffer() {
-    int cols = similarities.cols;
-    for (int j = replayFrames.size(); j < cols; j++) {
-        readReplayStream();
-    }
-}
-
-inline float computeSlit(const cv::Mat &similarities, const cv::Point3f &line) {
+bool VisualMatcher::computeMatching() {
     int rows = similarities.rows;
     int cols = similarities.cols;
-    float replay0 = line.x;
-    float teach0 = line.y;
-    float slope = line.z;
 
-    int rl = 0;
-    int rh = 0;
+    int row0 = teachFrames.size();
+    int col0 = replayFrames.size();
 
-    for (int j = replay0; j < cols; j++) {
-        int ic = teach0 + (j - replay0) * slope;
+    // Shift the similarity matrix to make room for new match estimations
+    clarus::shift(similarities, row0 - rows, col0 - cols);
 
-        int il = 0;
-        for (int i = 1; ic - i >= 0; i++) {
-            if (similarities.at<float>(ic - i, j) > 0) {
-                il = i;
-            }
+    // Fill teach buffer to capacity
+    for (int i = row0; i < rows; i++) {
+        if (!readTeachStream()) {
+            return false;
+        }
+    }
+
+    // Collect replay images, filling the similarity matrix along the way
+    for (int j = col0; j < cols; j++) {
+        if (!readReplayStream()) {
+            return false;
         }
 
-        int ih = 0;
-        for (int i = 0; ic + i < rows; i++) {
-            if (similarities.at<float>(ic + i, j) > 0) {
-                ih = i;
-            }
-        }
-
-        rl = std::max(rl, il);
-        rh = std::max(rh, ih);
-    }
-
-    return (rl + rh) / 2;
-}
-
-void VisualMatcher::computeMatching() {
-    fillTeachBuffer();
-    fillReplayBuffer();
-
-    int rows = similarities.rows;
-    int cols = similarities.cols;
-    for (int j = 0; j < cols; j++) {
-        std::cerr << "Processing replay image #" << j << std::endl;
         const FeatureMap &features = replayMaps.at(j);
         List<cv::Mat> results = features(teachEdges, padding_b);
         const cv::Mat &responses = results[0];
+        recordResponses(responses);
         displayMatches(results[1]);
         cv::Rect roi(j, 0, 1, rows);
         cv::Mat column(similarities, roi);
@@ -280,12 +236,14 @@ void VisualMatcher::computeMatching() {
     }
 
     cv::Point3f line = interpolator(similarities);
+    recordLines(line);
 
     index = line.x;
     replay0 = line.x;
     teach0 = line.y;
     slope = line.z;
-    slit = computeSlit(similarities, line);
 
-    displaySimilarities(similarities, line, slit);
+    displaySimilarities(similarities, line);
+
+    return true;
 }
