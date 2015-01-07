@@ -50,8 +50,15 @@ using clarus::List;
         viewer::show("DiVS (Replay)", bgr_replay);
         cv::waitKey(WAIT_KEY_MS);
     }
+
+    static void displayMemory(const std::string &title, const cv::Mat &image) {
+        viewer::show(title, image);
+        cv::waitKey(WAIT_KEY_MS);
+    }
 #else
     #define displayDiVS(A, B)
+
+    #define displayMemory(A, B)
 #endif
 
 inline cv::Mat preprocess(const cv::Mat &image) {
@@ -81,6 +88,9 @@ cv::Mat Estimator::operator () () {
 
         replay.record(preprocess(matched[0]));
         teach.record(preprocess(matched[1]));
+
+        displayMemory("Memory (Replay)", replay.last());
+        displayMemory("Memory (Teach)", teach.last());
     }
     while (teach.idle() > 0);
 
