@@ -62,7 +62,11 @@ using clarus::List;
 #endif
 
 inline cv::Mat preprocess(const cv::Mat &image) {
-    return colors::grayscale(cight::upper_half(image));
+    //return colors::grayscale(cight::upper_half(image));
+
+    cv::Mat grad;
+    cv::Sobel(cight::upper_half(image), grad, CV_8U, 1, 0, CV_SCHARR);
+    return grad;
 }
 
 Estimator::Estimator(int _bins, int _window, size_t range, StreamMatcher _matcher):
