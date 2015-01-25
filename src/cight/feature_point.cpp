@@ -20,7 +20,6 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #include <cight/feature_point.hpp>
 using cight::FeaturePoint;
 
-#include <clarus/core/math.hpp>
 #include <clarus/vision/fourier.hpp>
 
 FeaturePoint::FeaturePoint():
@@ -46,16 +45,14 @@ FeaturePoint::FeaturePoint(int x, int y, const cv::Mat &image, int padding):
     // Nothing to do.
 }
 
-float FeaturePoint::operator () (const cv::Mat &image, int padding) const {
+cv::Mat FeaturePoint::operator () (const cv::Mat &image, int padding) const {
     int w = roi.width + 2 * padding;
     int h = roi.height + 2 * padding;
     int x = std::min(std::max(0, roi.x - padding), image.cols - w);
     int y = std::min(std::max(0, roi.y - padding), image.rows - h);
 
     cv::Mat neighborhood(image, cv::Rect(x, y, w, h));
-    cv::Mat responses = fourier::correlate(neighborhood, patch);
-
-    return clarus::max(responses);
+    return fourier::correlate(neighborhood, patch);
 }
 
 const cv::Rect &FeaturePoint::bounds() const {

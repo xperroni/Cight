@@ -53,13 +53,9 @@ public:
     FeaturePoint(int x, int y, const cv::Mat &image, int padding);
 
     /**
-    \brief Evaluates the similarity between this feature point and the given image.
-
-    Returns the maximum similarity response between the patch around this feature point
-    and the given image, within the region of given padding (plus the feature point's
-    own padding) around the feature point's coordinates.
+    \brief Cross-correlates the teach and replay patches around this feature point.
     */
-    float operator () (const cv::Mat &image, int padding) const;
+    cv::Mat operator () (const cv::Mat &image, int padding) const;
 
     /**
     \brief Returns the boundaries of the patch around this feature point.
