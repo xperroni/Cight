@@ -29,11 +29,7 @@ using clarus::Point;
 
 List<FeaturePoint> cight::selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding) {
     List<FeaturePoint> regions = selector(bgr, padding);
-    for (int n = 0; (n = regions.size()) > limit;) {
-        regions.remove(n - 1);
-    }
-
-    return regions;
+    return (regions.size() > limit ? regions(0, limit) : regions);
 }
 
 List<FeaturePoint> cight::selectBorders(Selector selector, float ratio, const cv::Mat &bgr, int padding) {
@@ -57,6 +53,52 @@ List<FeaturePoint> cight::selectBorders(Selector selector, float ratio, const cv
     std::map<uint64_t, const FeaturePoint*>::iterator k = --(ordered.end());
     for (int i = 0; i < tops; ++i, --k) {
         regions.append(*(k->second));
+    }
+
+    return regions;
+}
+
+List<FeaturePoint> cight::selectDisjoint(Selector selector, const cv::Mat &bgr, int padding) {
+    static cv::Scalar BLACK(0);
+    static cv::Scalar WHITE(1);
+
+    List<FeaturePoint> selected = selector(bgr, padding);
+
+    int side = 2 * padding + 1;
+    List<FeaturePoint> disjoint;
+    cv::Mat mask(bgr.size(), CV_8U, cv::Scalar(0));
+    for (int k = 0, n = selected.size(); k < n; k++) {
+        const FeaturePoint &feature = selected[k];
+        const cv::Point &center = feature.point();
+        int x = center.x - padding;
+        int y = center.y - padding;
+
+        cv::Mat roi(mask, cv::Rect(x, y, side, side));
+
+        if (cv::sum(roi)[0] == 0) {
+            disjoint.append(feature);
+            roi = 1;
+        }
+    }
+
+    return disjoint;
+}
+
+static bool compareResponse(cv::KeyPoint a, cv::KeyPoint b) {
+    return (a.response > b.response);
+}
+
+List<FeaturePoint> cight::selectFAST(cv::FastFeatureDetector &detector, const cv::Mat &bgr, int padding) {
+    cv::Mat edges = filter::sobel(colors::grayscale(bgr));
+    List<cv::KeyPoint> keypoints;
+    detector.detect(edges, *keypoints);
+    clarus::sort(keypoints, compareResponse);
+
+    int rows = keypoints.size();
+    List<FeaturePoint> regions;
+    for (int k = 0; k < rows; k++) {
+        const cv::Point &point = keypoints[k].pt;
+        regions.append(FeaturePoint(point.x, point.y, edges, padding));
     }
 
     return regions;

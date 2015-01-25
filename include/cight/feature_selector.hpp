@@ -55,7 +55,17 @@ namespace cight {
     clarus::List<FeaturePoint> selectBorders(Selector selector, float ratio, const cv::Mat &bgr, int padding);
 
     /**
-    \brief Select interest regions based on strong corners.
+    \brief Returns a non-overlapping subset of feature points selected by an upstream selector.
+    */
+    clarus::List<FeaturePoint> selectDisjoint(Selector selector, const cv::Mat &bgr, int padding);
+
+    /**
+    \brief Select feature points based on FAST features.
+    */
+    clarus::List<FeaturePoint> selectFAST(cv::FastFeatureDetector &detector, const cv::Mat &bgr, int padding);
+
+    /**
+    \brief Select feature points based on strong corners.
     */
     clarus::List<FeaturePoint> selectGoodFeatures(
         cv::GoodFeaturesToTrackDetector &detector,
