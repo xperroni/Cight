@@ -65,7 +65,7 @@ static List<float> bestSlide(const cv::Mat &costs) {
     float b = cols - 1;
     float d = FLT_MAX;
     float n = std::min(rows, cols);
-    float x1n = n / 3;
+    float x1n = n / 2;
     float x2n = x1n * 2;
     for (float x2 = std::min(n + x1n, (float) cols - 1); x2 >= x2n; x2--) {
         for (float x1 = 0; x1 < x1n; x1++) {
