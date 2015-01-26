@@ -35,6 +35,13 @@ The build scripts expect to find the include files for [Clarus](https://github.c
        +-- include
        +-- src
 
+Version History
+---------------
+
+2015-01-26
+
+A hopelessly belated update, but better late than never. This version includes the new image pairing method described in [this report](https://github.com/xperroni/Yamabiko/blob/master/2014-2/Article/Image%20Stream%20Synchronization%20for%20Visual%20Navigation.pdf). In fact the actual implementation has progressed a little beyond what is reported here, and is currently in a state of flux, but it had been too long since I uploaded anything and I was growing weary of having no backup of this work. So there.
+
 TO DO
 -----
 
