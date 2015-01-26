@@ -67,6 +67,8 @@ inline cv::Mat preprocess(const cv::Mat &image) {
     cv::Mat grad;
     cv::Sobel(cight::upper_half(image), grad, CV_8U, 1, 0, CV_SCHARR);
     return grad;
+
+    return cight::upper_half(image);
 }
 
 Estimator::Estimator(int _bins, int _window, size_t range, StreamMatcher _matcher):
@@ -84,6 +86,9 @@ Estimator::~Estimator() {
 }
 
 cv::Mat Estimator::operator () () {
+    //List<cv::Mat> matched = matcher();
+    //return (matched.empty() ? cv::Mat() : matched[2]);
+
     do {
         List<cv::Mat> matched = matcher();
         if (matched.empty()) {
@@ -102,6 +107,11 @@ cv::Mat Estimator::operator () () {
     cv::Mat replayMap = change_average(replay);
 
     displayDiVS(teachMap, replayMap);
+
+    List<cv::Mat> matched = matcher();
+    if (matched.empty()) {
+        return cv::Mat();
+    }
 
     cv::Mat teachVector = column_histogram(teachMap, bins);
     cv::Mat replayVector = column_histogram(replayMap, bins);
