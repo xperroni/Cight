@@ -21,6 +21,8 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 using clarus::List;
 using cight::FeatureMap;
 
+#include <clarus/core/math.hpp>
+
 #include <map>
 
 #ifdef DIAGNOSTICS
@@ -55,6 +57,59 @@ FeatureMap::FeatureMap(Selector selector, const cv::Mat &bgr, int padding):
     display(bgr, features);
 }
 
+inline void update_shifts(cv::Mat &shifts, int i, int rows, cv::Mat &responses) {
+    if (shifts.empty()) {
+        shifts = cv::Mat(rows, responses.cols, responses.type(), cv::Scalar(0));
+    }
+
+    cv::Mat reduced;
+    reduced = responses - clarus::min(responses);
+    //viewer::plot("Responses", reduced);
+
+    cv::reduce(reduced, reduced, 0, CV_REDUCE_MAX);
+    cv::flip(reduced, reduced, 1);
+
+    cv::Mat row(shifts, cv::Rect(0, i, reduced.cols, 1));
+    row += reduced - clarus::min(reduced);
+}
+/*
+inline void update_shifts(cv::Mat &shifts, int i, int rows, cv::Mat &responses) {
+    int cols = responses.cols;
+    if (shifts.empty()) {
+        shifts = cv::Mat(rows, cols, responses.type(), cv::Scalar(0));
+    }
+
+    cv::Mat reduced(1, cols, CV_64F, cv::Scalar(0));
+    for (int j = 0, n = responses.rows; j < n; j++) {
+        cv::Mat row(responses, cv::Rect(0, j, cols, 1));
+        cv::Point point = clarus::argmax(row);
+        reduced.at<double>(0, point.x) += 1.0;
+    }
+    cv::flip(reduced, reduced, 1);
+
+    cv::Mat row(shifts, cv::Rect(0, i, cols, 1));
+    row += reduced;
+}
+
+inline void update_shifts(cv::Mat &shifts, int i, int rows, cv::Mat &responses) {
+    //viewer::plot("Responses", responses);
+
+    int cols = responses.cols;
+    if (shifts.empty()) {
+        shifts = cv::Mat(rows, cols, responses.type(), cv::Scalar(0));
+    }
+
+    cv::Point point = clarus::argmax(responses);
+    cv::Mat maxed(responses, cv::Rect(0, point.y, cols, 1));
+
+    maxed = maxed.clone();
+    cv::flip(maxed, maxed, 1);
+    maxed -= clarus::min(maxed);
+
+    cv::Mat row(shifts, cv::Rect(0, i, cols, 1));
+    row += maxed;
+}
+*/
 List<cv::Mat> FeatureMap::operator () (const List<cv::Mat> &images, int padding, int i0, int n) const {
     int rows = images.size();
     int cols = features.size();
@@ -64,11 +119,15 @@ List<cv::Mat> FeatureMap::operator () (const List<cv::Mat> &images, int padding,
 
     cv::Mat similarities(rows, cols, CV_32F, cv::Scalar(0));
     cv::Mat maxima(1, cols, CV_32S, cv::Scalar(0));
+    //cv::Mat shifts;
 
     for (int i = i0; i < n; i++) {
         for (int j = 0; j < cols; j++) {
+            const cv::Mat &image = images.at(i);
             const FeaturePoint &point = features[j];
-            float value = point(images.at(i), padding);
+            cv::Mat responses = point(image, padding);
+            //update_shifts(shifts, i, rows, responses);
+            float value = clarus::max(responses);
             similarities.at<float>(i, j) = value;
 
             int l = maxima.at<int>(0, j);
