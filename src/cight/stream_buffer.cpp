@@ -42,6 +42,9 @@ bool StreamBuffer::read() {
     }
 
     frames.append(frame);
+    if (frames.size() > size) {
+        pop();
+    }
 
     return true;
 }
