@@ -23,20 +23,22 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #include <opencv2/opencv.hpp>
 
 namespace cight {
-    class FeaturePoint;
+    struct FeaturePoint;
 }
 
-class cight::FeaturePoint {
+struct cight::FeaturePoint {
     /** \brief Bounds of the patch around the feature point. */
-    cv::Rect roi;
+    cv::Rect bounds;
 
     /** \brief Feature point's coordinates. */
-    cv::Point poi;
+    cv::Point center;
 
     /** \brief Contents of the patch around the feature point. */
     cv::Mat patch;
 
-public:
+    /** \brief The feature point's relevance value. */
+    float strength;
+
     /**
     \brief Creates a new, blank feature point.
     */
@@ -52,25 +54,12 @@ public:
     */
     FeaturePoint(int x, int y, const cv::Mat &image, int padding);
 
+    FeaturePoint(const cv::KeyPoint &point, const cv::Mat &image, int padding);
+
     /**
     \brief Cross-correlates the teach and replay patches around this feature point.
     */
     cv::Mat operator () (const cv::Mat &image, int padding) const;
-
-    /**
-    \brief Returns the boundaries of the patch around this feature point.
-    */
-    const cv::Rect &bounds() const;
-
-    /**
-    \brief Returns the feature point's coordinates.
-    */
-    const cv::Point &point() const;
-
-    /**
-    \brief Returns whether all pixels within the interest region have zero values.
-    */
-    bool empty() const;
 };
 
 #endif

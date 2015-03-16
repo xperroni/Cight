@@ -46,6 +46,11 @@ public:
     FeatureMap(Selector selector, const cv::Mat &bgr, int padding);
 
     /**
+    \brief Creates a new feature map containing the given features.
+    */
+    FeatureMap(const clarus::List<FeaturePoint> &features);
+
+    /**
     \brief Evaluates the similarity between this feature map and the given image list.
 
     Images are expected to be preprocessed in a format appropriate for feature point
@@ -66,6 +71,11 @@ public:
     evaluated image.
     */
     clarus::List<cv::Mat> operator () (const clarus::List<cv::Mat> &images, int padding, int i0 = 0, int n = 0) const;
+
+    /**
+    \brief Returns the number of feature points contained by this map.
+    */
+    size_t size() const;
 };
 
 #endif

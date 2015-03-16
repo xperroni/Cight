@@ -40,7 +40,7 @@ using cight::FeatureMap;
 
         cv::Mat canvas = colors::convert(filter::sobel(colors::grayscale(bgr)), CV_GRAY2BGR);
         for (int i = 0, n = regions.size(); i < n; i++) {
-            cv::rectangle(canvas, regions[i].bounds(), RED);
+            cv::rectangle(canvas, regions[i].bounds, RED);
         }
 
         images::save(canvas, "regions-" + types::to_string(index++) + ".png");
@@ -55,6 +55,12 @@ FeatureMap::FeatureMap(Selector selector, const cv::Mat &bgr, int padding):
     features(selector(bgr, padding))
 {
     display(bgr, features);
+}
+
+FeatureMap::FeatureMap(const List<FeaturePoint> &_features):
+    features(_features)
+{
+    // Nothing to do.
 }
 
 inline void update_shifts(cv::Mat &shifts, int i, int rows, cv::Mat &responses) {
@@ -144,4 +150,8 @@ List<cv::Mat> FeatureMap::operator () (const List<cv::Mat> &images, int padding,
     }
 
     return (List<cv::Mat>(), responses, similarities);
+}
+
+size_t FeatureMap::size() const {
+    return features.size();
 }

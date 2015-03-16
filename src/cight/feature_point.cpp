@@ -23,8 +23,8 @@ using cight::FeaturePoint;
 #include <clarus/vision/fourier.hpp>
 
 FeaturePoint::FeaturePoint():
-    roi(0, 0, 0, 0),
-    poi(0, 0),
+    bounds(0, 0, 0, 0),
+    center(0, 0),
     patch()
 {
     // Nothing to do.
@@ -37,32 +37,36 @@ inline cv::Rect regionOfInterest(int x, int y, const cv::Mat &image, int padding
     return cv::Rect(xf, yf, side, side);
 }
 
+inline float standardDeviation(const cv::Mat &patch) {
+    cv::Mat mean, stddev;
+    cv::meanStdDev(patch, mean, stddev);
+    return stddev.at<double>(0, 0);
+}
+
 FeaturePoint::FeaturePoint(int x, int y, const cv::Mat &image, int padding):
-    roi(regionOfInterest(x, y, image, padding)),
-    poi(roi.x + roi.width / 2, roi.y + roi.height / 2),
-    patch(image, roi)
+    bounds(regionOfInterest(x, y, image, padding)),
+    center(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2),
+    patch(image, bounds),
+    strength(standardDeviation(patch))
+{
+    // Nothing to do.
+}
+
+FeaturePoint::FeaturePoint(const cv::KeyPoint &point, const cv::Mat &image, int padding):
+    bounds(regionOfInterest(point.pt.x, point.pt.y, image, padding)),
+    center(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2),
+    patch(image, bounds),
+    strength(point.response)
 {
     // Nothing to do.
 }
 
 cv::Mat FeaturePoint::operator () (const cv::Mat &image, int padding) const {
-    int w = roi.width + 2 * padding;
-    int h = roi.height + 2 * padding;
-    int x = std::min(std::max(0, roi.x - padding), image.cols - w);
-    int y = std::min(std::max(0, roi.y - padding), image.rows - h);
+    int w = bounds.width + 2 * padding;
+    int h = bounds.height + 2 * padding;
+    int x = std::min(std::max(0, bounds.x - padding), image.cols - w);
+    int y = std::min(std::max(0, bounds.y - padding), image.rows - h);
 
     cv::Mat neighborhood(image, cv::Rect(x, y, w, h));
     return fourier::correlate(neighborhood, patch);
-}
-
-const cv::Rect &FeaturePoint::bounds() const {
-    return roi;
-}
-
-const cv::Point &FeaturePoint::point() const {
-    return poi;
-}
-
-bool FeaturePoint::empty() const {
-    return (cv::sum(patch)[0] == 0);
 }
