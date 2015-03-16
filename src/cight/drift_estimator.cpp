@@ -27,6 +27,7 @@ using clarus::List;
 
 #include <clarus/vision/colors.hpp>
 #include <clarus/vision/fourier.hpp>
+#include <clarus/vision/images.hpp>
 
 #ifdef DIAGNOSTICS
     #include <clarus/core/types.hpp>
@@ -42,8 +43,8 @@ using clarus::List;
 
         static int index = 0;
 
-        cv::Mat bgr_teach = depths::bgr(teach);
-        cv::Mat bgr_replay = depths::bgr(replay);
+        cv::Mat bgr_teach = depths::bgr(images::convert(teach, CV_32F));
+        cv::Mat bgr_replay = depths::bgr(images::convert(replay, CV_32F));
         images::save(bgr_teach, "divs-teach-" + types::to_string(index) + ".png");
         images::save(bgr_replay, "divs-replay-" + types::to_string(index++) + ".png");
         viewer::show("DiVS (Teach)", bgr_teach);
@@ -63,11 +64,11 @@ using clarus::List;
 
 inline cv::Mat preprocess(const cv::Mat &image) {
     //return colors::grayscale(cight::upper_half(image));
-
+/*
     cv::Mat grad;
     cv::Sobel(cight::upper_half(image), grad, CV_8U, 1, 0, CV_SCHARR);
     return grad;
-
+*/
     return cight::upper_half(image);
 }
 
@@ -98,8 +99,8 @@ cv::Mat Estimator::operator () () {
         replay.record(preprocess(matched[0]));
         teach.record(preprocess(matched[1]));
 
-        displayMemory("Memory (Replay)", replay.last());
-        displayMemory("Memory (Teach)", teach.last());
+        //displayMemory("Memory (Replay)", replay.last());
+        //displayMemory("Memory (Teach)", teach.last());
     }
     while (teach.idle() > 0);
 
@@ -120,7 +121,7 @@ cv::Mat Estimator::operator () () {
     cv::Mat responses(1, n * 2, CV_64F, cv::Scalar::all(0));
     for (int i = 0, m = 1 + n - window; i < m; i++) {
         cv::Mat b(teachVector, cv::Rect(i, 0, window, 1));
-        cv::Mat c = fourier::correlate(replayVector, b);
+        cv::Mat c = fourier::correlate(replayVector, b, false);
         cv::Mat r(responses, cv::Rect(n - i, 0, n, 1));
         r += c;
     }
