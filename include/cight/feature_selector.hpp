@@ -24,6 +24,7 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 
 #include <clarus/core/list.hpp>
 
+#include <boost/bind.hpp>
 #include <boost/function.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -58,6 +59,27 @@ namespace cight {
     \brief Returns a non-overlapping subset of feature points selected by an upstream selector.
     */
     clarus::List<FeaturePoint> selectDisjoint(Selector selector, const cv::Mat &bgr, int padding);
+
+    /**
+    \brief Select feature points that are above the image's average intensity.
+
+    The image is assumed to be of type <tt>CV_8UC1</tt>.
+    */
+    clarus::List<FeaturePoint> selectAboveMean(const cv::Mat &image, int padding);
+
+    /**
+    \brief Select feature points based on the difference between a given image and a previous one.
+
+    When using this selector, bind it to an empty cv::Mat object, e.g.:
+
+    Selector selector = boost::bind(selectDifference, boost::ref(cv::Mat()), 20.0, _1, _2);
+
+    The first call will result on an empty list, but the following ones will produce feature points
+    based on the differences between successive inputs. (You could of course also bind it to the
+    first image in a sequence and start feeding the selector the second image onwards, in which case
+    the first output won't necessarily be empty.)
+    */
+    clarus::List<FeaturePoint> selectDifference(cv::Mat &previous, float t, const cv::Mat &image, int padding);
 
     /**
     \brief Select feature points based on FAST features.

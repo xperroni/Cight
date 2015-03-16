@@ -26,6 +26,7 @@ using clarus::Point;
 
 #include <clarus/vision/colors.hpp>
 #include <clarus/vision/filters.hpp>
+#include <clarus/vision/images.hpp>
 
 List<FeaturePoint> cight::selectAtMost(Selector selector, int limit, const cv::Mat &bgr, int padding) {
     List<FeaturePoint> regions = selector(bgr, padding);
@@ -40,8 +41,8 @@ List<FeaturePoint> cight::selectBorders(Selector selector, float ratio, const cv
     std::map<uint64_t, const FeaturePoint*> ordered;
     for (int k = 0, n = selected.size(); k < n; k++) {
         const FeaturePoint &region = selected[k];
-        const cv::Point &center = region.point();
-        if (!region.empty()) {
+        const cv::Point &center = region.center;
+        if (region.strength > 0.0) {
             uint64_t d = abs(xc - center.x) + abs(yc - center.y);
             uint64_t key = (d << 32) + ordered.size();
             ordered[key] = &region;
@@ -58,27 +59,43 @@ List<FeaturePoint> cight::selectBorders(Selector selector, float ratio, const cv
     return regions;
 }
 
-List<FeaturePoint> cight::selectDisjoint(Selector selector, const cv::Mat &bgr, int padding) {
+static bool sortFeaturePoints(const FeaturePoint &a, const FeaturePoint &b) {
+    return a.strength > b.strength;
+}
+
+List<FeaturePoint> cight::selectDisjoint(Selector selector, const cv::Mat &image, int padding) {
     static cv::Scalar BLACK(0);
     static cv::Scalar WHITE(1);
 
-    List<FeaturePoint> selected = selector(bgr, padding);
+    List<FeaturePoint> selected = selector(image, padding);
+    clarus::sort(selected, sortFeaturePoints);
+
+    List<FeaturePoint> disjoint;
+    cv::Mat active(image.size(), CV_8U, BLACK);
+    int rows = image.rows;
+    int cols = image.cols;
 
     int side = 2 * padding + 1;
-    List<FeaturePoint> disjoint;
-    cv::Mat mask(bgr.size(), CV_8U, cv::Scalar(0));
+    int padding2 = 2 * padding;
+    int side2 = 2 * padding2 + 1;
+
     for (int k = 0, n = selected.size(); k < n; k++) {
         const FeaturePoint &feature = selected[k];
-        const cv::Point &center = feature.point();
-        int x = center.x - padding;
-        int y = center.y - padding;
+        const cv::Point &point = feature.center;
+        int x = point.x;
+        int y = point.y;
 
-        cv::Mat roi(mask, cv::Rect(x, y, side, side));
-
-        if (cv::sum(roi)[0] == 0) {
-            disjoint.append(feature);
-            roi = 1;
+        int i = y + std::max(padding - y, 0) + std::min(rows - y - padding, 0);
+        int j = x + std::max(padding - x, 0) + std::min(cols - x - padding, 0);
+        if (active.at<uint8_t>(i, j) == 1) {
+            continue;
         }
+
+        disjoint.append(feature);
+
+        int x2 = std::min(std::max(j - padding2, 0), cols - side2);
+        int y2 = std::min(std::max(i - padding2, 0), rows - side2);
+        cv::rectangle(active, cv::Rect(x2, y2, side2, side2), WHITE, CV_FILLED);
     }
 
     return disjoint;
@@ -97,8 +114,7 @@ List<FeaturePoint> cight::selectFAST(cv::FastFeatureDetector &detector, const cv
     int rows = keypoints.size();
     List<FeaturePoint> regions;
     for (int k = 0; k < rows; k++) {
-        const cv::Point &point = keypoints[k].pt;
-        regions.append(FeaturePoint(point.x, point.y, edges, padding));
+        regions.append(FeaturePoint(keypoints[k], edges, padding));
     }
 
     return regions;
@@ -116,8 +132,7 @@ List<FeaturePoint> cight::selectGoodFeatures(
     int rows = keypoints.size();
     List<FeaturePoint> regions;
     for (int k = 0; k < rows; k++) {
-        const cv::Point &point = keypoints[k].pt;
-        regions.append(FeaturePoint(point.x, point.y, edges, padding));
+        regions.append(FeaturePoint(keypoints[k], edges, padding));
     }
 
     return regions;
@@ -169,6 +184,54 @@ static cv::Mat boundaries(const cv::Mat &bgr, const cv::Mat &markers) {
     }
 
     return borders;
+}
+
+static bool sort_points(const cv::Point3f &a, const cv::Point3f &b) {
+    return a.z > b.z;
+}
+
+List<FeaturePoint> cight::selectDifference(cv::Mat &previous, float t, const cv::Mat &image, int padding) {
+    if (previous.empty()) {
+        image.copyTo(previous);
+        return List<FeaturePoint>();
+    }
+
+    cv::Mat data = images::difference(previous, image);
+    List<cv::Point3f> points;
+    int rows = data.rows;
+    int cols = data.cols;
+
+    List<FeaturePoint> features;
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            float v = data.at<int>(i, j);
+            if (v > t) {
+                features.append(FeaturePoint(j, i, image, padding));
+            }
+        }
+    }
+
+    image.copyTo(previous);
+    return features;
+}
+
+List<FeaturePoint> cight::selectAboveMean(const cv::Mat &image, int padding) {
+    double mean = clarus::mean(image);
+    List<cv::Point3f> points;
+    int rows = image.rows;
+    int cols = image.cols;
+
+    List<FeaturePoint> features;
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            float v = image.at<uint8_t>(i, j);
+            if (v > mean) {
+                features.append(FeaturePoint(j, i, image, padding));
+            }
+        }
+    }
+
+    return features;
 }
 
 typedef std::vector<cv::Point> Contour;
