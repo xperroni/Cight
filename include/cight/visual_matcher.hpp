@@ -31,11 +31,11 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 #include <clarus/core/list.hpp>
 
 namespace cight {
-    struct StreamTeach;
+    struct StreamTeachV;
 
-    struct StreamReplay;
+    struct StreamReplayV;
 
-    struct SimilarityMap;
+    struct SimilarityMapV;
 
     struct VisualMatcher;
 }
@@ -43,7 +43,7 @@ namespace cight {
 /**
 \brief Teach step memory pipeline.
 */
-struct cight::StreamTeach: public StreamBuffer {
+struct cight::StreamTeachV: public StreamBuffer {
     /** \brief Memory buffer for the teach stream edge maps. */
     clarus::List<cv::Mat> edges;
 
@@ -53,7 +53,7 @@ struct cight::StreamTeach: public StreamBuffer {
     /**
     \brief Default constructor.
     */
-    StreamTeach();
+    StreamTeachV();
 
     /**
     \brief Creates a new teach step memory pipeline.
@@ -61,7 +61,7 @@ struct cight::StreamTeach: public StreamBuffer {
     The pipeline is bound to the given input stream, and internal buffers store
     items up to the given size.
     */
-    StreamTeach(SensorStream stream, size_t size, int padding);
+    StreamTeachV(SensorStream stream, size_t size, int padding);
 
     /**
     Discards the first item of each internal buffer.
@@ -80,7 +80,7 @@ struct cight::StreamTeach: public StreamBuffer {
 /**
 \brief Replay step memory pipeline.
 */
-struct cight::StreamReplay: public StreamBuffer {
+struct cight::StreamReplayV: public StreamBuffer {
     /** \brief Memory buffer for replay stream feature maps. */
     clarus::List<FeatureMap> maps;
 
@@ -97,7 +97,7 @@ struct cight::StreamReplay: public StreamBuffer {
     /**
     \brief Default constructor.
     */
-    StreamReplay();
+    StreamReplayV();
 
     /**
     \brief Creates a new replay step memory pipeline.
@@ -105,12 +105,12 @@ struct cight::StreamReplay: public StreamBuffer {
     The pipeline is bound to the given input stream, and internal buffers store
     items up to the given size.
     */
-    StreamReplay(SensorStream stream, size_t size, Selector selector, int padding);
+    StreamReplayV(SensorStream stream, size_t size, Selector selector, int padding);
 
     /**
     \brief Returns the similarities between the given replay image and the current contents of the teach buffer.
     */
-    clarus::List<cv::Mat> operator () (int j, StreamTeach &teach);
+    clarus::List<cv::Mat> operator () (int j, StreamTeachV &teach);
 
     /**
     Discards the first item of each internal buffer.
@@ -131,32 +131,32 @@ struct cight::StreamReplay: public StreamBuffer {
     cv::Mat shifted(int i, int j) const;
 };
 
-struct cight::SimilarityMap: public cv::Mat {
+struct cight::SimilarityMapV: public cv::Mat {
     /**
     \brief Default constructor.
     */
-    SimilarityMap();
+    SimilarityMapV();
 
     /**
     \brief Creates a new similarity map of given dimensions.
     */
-    SimilarityMap(const cv::Size &size);
+    SimilarityMapV(const cv::Size &size);
 
     /**
     \brief Updates the similarity map with data from the given streams.
     */
-    bool update(StreamTeach &teach, StreamReplay &replay);
+    bool update(StreamTeachV &teach, StreamReplayV &replay);
 };
 
 struct cight::VisualMatcher {
     /** \brief Teach step memory pipeline. */
-    StreamTeach teach;
+    StreamTeachV teach;
 
     /** \brief Replay step memory pipeline. */
-    StreamReplay replay;
+    StreamReplayV replay;
 
     /** \brief Similarity map relating teach (columns) and replay (rows) frames. */
-    SimilarityMap similarities;
+    SimilarityMapV similarities;
 
     /** \brief Function used to interpolate a stream matching line over the current similarity map. */
     Interpolator interpolator;

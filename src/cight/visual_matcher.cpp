@@ -19,9 +19,9 @@ along with Cight. If not, see <http://www.gnu.org/licenses/>.
 
 #include <cight/visual_matcher.hpp>
 using cight::StreamBuffer;
-using cight::StreamTeach;
-using cight::StreamReplay;
-using cight::SimilarityMap;
+using cight::StreamTeachV;
+using cight::StreamReplayV;
+using cight::SimilarityMapV;
 using cight::VisualMatcher;
 using clarus::List;
 
@@ -90,13 +90,13 @@ using clarus::List;
     #define recordLines(A)
 #endif
 
-StreamTeach::StreamTeach():
+StreamTeachV::StreamTeachV():
     StreamBuffer()
 {
     // Nothing to do.
 }
 
-StreamTeach::StreamTeach(SensorStream _stream, size_t _size, int padding_b):
+StreamTeachV::StreamTeachV(SensorStream _stream, size_t _size, int padding_b):
     StreamBuffer(_stream, _size),
     padding(padding_b)
 {
@@ -121,12 +121,12 @@ inline cv::Mat preprocess2(const cv::Mat &bgr) {
 */
 }
 
-void StreamTeach::pop() {
+void StreamTeachV::pop() {
     frames.remove(0);
     edges.remove(0);
 }
 
-bool StreamTeach::read() {
+bool StreamTeachV::read() {
     cv::Mat frame = stream();
     if (frame.empty()) {
         return false;
@@ -145,13 +145,13 @@ bool StreamTeach::read() {
     return true;
 }
 
-StreamReplay::StreamReplay():
+StreamReplayV::StreamReplayV():
     StreamBuffer()
 {
     // Nothing to do.
 }
 
-StreamReplay::StreamReplay(SensorStream _stream, size_t _size, Selector _selector, int padding_a):
+StreamReplayV::StreamReplayV(SensorStream _stream, size_t _size, Selector _selector, int padding_a):
     StreamBuffer(_stream, _size),
     selector(_selector),
     padding(padding_a)
@@ -159,30 +159,35 @@ StreamReplay::StreamReplay(SensorStream _stream, size_t _size, Selector _selecto
     // Nothing to do.
 }
 
-List<cv::Mat> StreamReplay::operator () (int j, StreamTeach &teach) {
+List<cv::Mat> StreamReplayV::operator () (int j, StreamTeachV &teach) {
     const FeatureMap &features = maps.at(j);
     List<cv::Mat> results = features(teach.edges, teach.padding);
     //shifts.at(j) = results[1];
     return results;
 }
 
-void StreamReplay::pop() {
+void StreamReplayV::pop() {
     frames.remove(0);
     maps.remove(0);
     //shifts.remove(0);
 }
 
-bool StreamReplay::read() {
-    cv::Mat frame = stream();
-    if (frame.empty()) {
-        return false;
+bool StreamReplayV::read() {
+    for (;;) {
+        cv::Mat frame = stream();
+        if (frame.empty()) {
+            return false;
+        }
+
+        cv::Mat grays = preprocess2(frame);
+
+        FeatureMap features(selector, grays, padding);
+        if (features.size() > 0) {
+            maps.append(features);
+            frames.append(grays);
+            break;
+        }
     }
-
-    cv::Mat grays = preprocess2(frame);
-    frames.append(grays);
-
-    FeatureMap features(selector, grays, padding);
-    maps.append(features);
 
     //shifts.append();
 
@@ -193,23 +198,23 @@ bool StreamReplay::read() {
     return true;
 }
 
-cv::Mat StreamReplay::shifted(int i, int j) const {
+cv::Mat StreamReplayV::shifted(int i, int j) const {
     cv::Mat matrix = shifts.at(i);
     cv::Mat row(matrix, cv::Rect(0, i, matrix.cols, 1));
     return row;
 }
 
-SimilarityMap::SimilarityMap() {
+SimilarityMapV::SimilarityMapV() {
     // Nothing to do.
 }
 
-SimilarityMap::SimilarityMap(const cv::Size &size):
+SimilarityMapV::SimilarityMapV(const cv::Size &size):
     cv::Mat(size, CV_32F, cv::Scalar(0))
 {
     // Nothing to do.
 }
 
-bool SimilarityMap::update(StreamTeach &teach, StreamReplay &replay) {
+bool SimilarityMapV::update(StreamTeachV &teach, StreamReplayV &replay) {
     int row0 = teach.frames.size();
     int col0 = replay.frames.size();
 
